@@ -17,7 +17,6 @@ status::status(const std::string& error)
 {
 }
 
-
 bool status::failed() const
 {
     return m_error.has_value();

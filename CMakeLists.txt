@@ -47,12 +47,15 @@ include_directories(
 
 set(nats_asio_SRCS
 	"${LINCLUDE}/defs.hpp"
-	"${LINCLUDE}/nats_client.hpp"
 	"${LINCLUDE}/client.hpp"
 	"${LINCLUDE}/common.hpp"
+	"${LINCLUDE}/connection.hpp"
+	"${LINCLUDE}/fwd.hpp"
+	"${LINCLUDE}/structs.hpp"
 	"common.cpp"
-	"nats_client.cpp"
+	"connection.cpp"
 	"client.cpp"
+	"structs.cpp"
 )
 
 
