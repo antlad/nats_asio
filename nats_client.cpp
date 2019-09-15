@@ -1,4 +1,4 @@
-#include "nats_client.hpp"
+#include <nats-asio/nats_client.hpp>
 
 namespace nats_asio {
 

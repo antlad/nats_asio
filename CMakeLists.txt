@@ -15,6 +15,7 @@ set(Boost_USE_STATIC_LIBS OFF)
 set(Boost_USE_MULTITHREADED ON)
 set(Boost_USE_STATIC_RUNTIME OFF)
 add_definitions(-DBOOST_ALL_DYN_LINK)
+add_definitions(-DSPDLOG_FMT_EXTERNAL)
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake")
 
@@ -24,7 +25,8 @@ find_package(spdlog REQUIRED)
 find_package(OpenSSL REQUIRED)
 
 include_directories(
-	    "${CMAKE_INSTALL_PREFIX}/include"
+	    "${CMAKE_CURRENT_LIST_DIR}/include"
+		"${CMAKE_INSTALL_PREFIX}/include"
 		"${CMAKE_PREFIX_PATH}/include"
 		"${Boost_INCLUDE_DIRS}"
 		"${OPENSSL_INCLUDE_DIR}"
@@ -36,24 +38,28 @@ include_directories(
 #find_package(FlatBuffers REQUIRED)
 #find_package(gRPC REQUIRED)
 
+set(LINCLUDE "${CMAKE_CURRENT_LIST_DIR}/include/nats-asio" )
+
 include_directories(
 	"${CMAKE_INSTALL_PREFIX}/include"
 	"${CMAKE_PREFIX_PATH}/include"
 	)
 
 set(nats_asio_SRCS
-	defs.hpp
-	nats_client.hpp
-	nats_client.cpp
-	client.cpp
-	client.hpp
+	"${LINCLUDE}/defs.hpp"
+	"${LINCLUDE}/nats_client.hpp"
+	"${LINCLUDE}/client.hpp"
+	"${LINCLUDE}/common.hpp"
+	"common.cpp"
+	"nats_client.cpp"
+	"client.cpp"
 )
 
 
 add_library(nats_asio ${nats_asio_SRCS})
 add_executable(nats_asio_check main.cpp)
 
-target_link_libraries(nats_asio_check  pthread nats_asio "${Boost_COROUTINE_LIBRARIES}" OpenSSL::Crypto OpenSSL::SSL)
+target_link_libraries(nats_asio_check  pthread nats_asio "${Boost_COROUTINE_LIBRARIES}" OpenSSL::Crypto OpenSSL::SSL fmt::fmt)
 
 #if (ENABLE_TESTS)
 #        enable_testing()
