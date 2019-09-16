@@ -47,7 +47,6 @@ include_directories(
 
 set(nats_asio_SRCS
 	"${LINCLUDE}/defs.hpp"
-	"${LINCLUDE}/client.hpp"
 	"${LINCLUDE}/common.hpp"
 	"${LINCLUDE}/connection.hpp"
 	"${LINCLUDE}/fwd.hpp"
@@ -55,7 +54,6 @@ set(nats_asio_SRCS
 	"${LINCLUDE}/interface.hpp"
 	"common.cpp"
 	"connection.cpp"
-	"client.cpp"
 	"structs.cpp"
 )
 

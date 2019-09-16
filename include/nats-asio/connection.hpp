@@ -20,6 +20,8 @@ public:
 
     virtual status publish(std::string_view subject, const char* raw, std::size_t n, std::optional<std::string_view> reply_to, ctx c) override;
 
+    virtual status unsubscribe(const isubscription_sptr& p, ctx c) override;
+
     virtual std::tuple<isubscription_sptr,status> subscribe(std::string_view subject,  std::optional<std::string_view> queue, on_message_cb cb, ctx c) override;
 
     void run(ctx c);

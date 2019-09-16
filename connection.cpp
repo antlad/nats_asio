@@ -9,26 +9,30 @@
 
 #include <nlohmann/json.hpp>
 
-
-
 namespace nats_asio {
 
 struct subscription: public isubscription
 {
     subscription(uint64_t sid, const on_message_cb& cb)
-        : m_sid(sid)
+        : m_cancel(false)
         , m_cb(cb)
+        , m_sid(sid)
     {
     }
-    virtual status unsubscribe() override
+    virtual void cancel() override
     {
-        return {};
+        m_cancel = true;
     }
 
-    uint64_t m_sid;
+    virtual uint64_t sid() override
+    {
+        return m_sid;
+    }
+
+    bool m_cancel;
     on_message_cb m_cb;
+    uint64_t m_sid;
 };
-
 
 enum class mt {
     INFO,
@@ -56,12 +60,8 @@ const std::map<std::string, mt, std::less<>> message_types_map {
     {"-ERR", mt::ERR},
     };
 
-const std::string rn("\r\n");
-const std::string ping("PING\r\n");
-const std::string pong("PONG\r\n");
-
-
-
+//const std::string rn("\r\n");
+//const std::string ping("PING\r\n");
 //PUB <subject> [reply-to] <#bytes>\r\n[payload]\r\n
 
 std::string connection::prepare_info(const options& o)
@@ -130,6 +130,11 @@ status connection::process_subscription_message(std::string_view v, ctx c)
         return {};
     }
 
+    if (it->second->m_cancel)
+    {
+        m_log->trace("subscribtion canceled {}", sid);
+        return unsubscribe(it->second, c);
+    }
     it->second->m_cb(results[0], &v[p + 3], bytes_n, c);
 
     return {};
@@ -163,7 +168,8 @@ status connection::process_message(std::string_view v, ctx c)
     case mt::PING:{
         m_log->trace("ping recived");
         boost::system::error_code ec;
-        m_socket.async_write_some(boost::asio::buffer(pong), c[ec]);
+
+        m_socket.async_write_some(boost::asio::buffer("PONG\r\n"), c[ec]);
         if (ec.failed())
         {
             return status(fmt::format("failed to write pong {}", ec.message()));
@@ -209,6 +215,14 @@ status connection::connect(std::string_view address, uint16_t port, ctx c)
 }
 
 
+
+
+template< size_t N >
+constexpr size_t length( char const (&)[N] )
+{
+    return N-1;
+}
+
 void connection::run(ctx c)
 {
     std::string data;
@@ -229,7 +243,7 @@ void connection::run(ctx c)
     }
     buf.consume(data.size());
 
-    m_socket.async_write_some(boost::asio::buffer(ping), c[ec]);
+    m_socket.async_write_some(boost::asio::buffer("PING\r\n"), c[ec]);
     if (ec.failed())
     {
         m_log->error("failed to write pong {}", ec.message());
@@ -257,20 +271,53 @@ void connection::run(ctx c)
 status connection::publish(std::string_view subject, const char *raw, std::size_t n, std::optional<std::string_view> reply_to, ctx c)
 {
     constexpr auto pub_header_payload = "PUB {} {} {}\r\n";
+    std::string header;
+    if (reply_to.has_value())
+    {
+        header = fmt::format(pub_header_payload, subject, reply_to.value(), n);
+
+    } else
+    {
+        header = fmt::format(pub_header_payload, subject, "", n);
+    }
+
+    m_socket.async_write_some(boost::asio::buffer(header), c[ec]);
+    if (ec.failed())
+    {
+        return status(fmt::format("write to socket failed {}", ec.message()));
+    }
+
+    m_socket.async_write_some(boost::asio::buffer(raw, n), c[ec]);
+    if (ec.failed())
+    {
+        return status(fmt::format("write to socket failed {}", ec.message()));
+    }
 
     return {};
 }
 
-//subscription_sptr connection::subscribe_queue(std::string_view subject, std::string_view queue, on_message_cb cb, ctx c)
-//{
-//    return {};
-//}
+status connection::unsubscribe(const isubscription_sptr &p, ctx c)
+{
+    auto it = m_subs.find(p->sid());
+    if (it == m_subs.end())
+    {
+        return status(fmt::format("subscription not found {}", p->sid()));
+    }
+    m_subs.erase(it);
+
+    constexpr auto unsub_payload = "UNSUB {}\r\n";
+    m_socket.async_write_some(boost::asio::buffer(fmt::format(unsub_payload, p->sid())), c[ec]);
+    if (ec.failed())
+    {
+        return status(fmt::format("write to socket failed {}", ec.message()));
+    }
+    return {};
+}
 
 iconnection_sptr create_connection(const logger& log, aio& io)
 {
     return std::make_shared<connection>(log, io);
 }
-
 
 std::tuple<isubscription_sptr, status> connection::subscribe(std::string_view subject,  std::optional<std::string_view> queue, on_message_cb cb, ctx c)
 {
@@ -279,10 +326,11 @@ std::tuple<isubscription_sptr, status> connection::subscribe(std::string_view su
     std::string payload;
     if (queue.has_value())
     {
-        payload = fmt::format(sub_payload, subject, "", sid);
+        payload = fmt::format(sub_payload, subject, queue.value(), sid);
+
     } else
     {
-        payload = fmt::format(sub_payload, subject, queue.value(), sid);
+        payload = fmt::format(sub_payload, subject, "", sid);
     }
 
 
