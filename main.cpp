@@ -1,7 +1,9 @@
-#include <nats-asio/client.hpp>
-#include <nats-asio/fwd.hpp>
-#include <nats-asio/defs.hpp>
-#include <nats-asio/connection.hpp>
+//#include <nats-asio/client.hpp>
+//#include <nats-asio/fwd.hpp>
+//#include <nats-asio/defs.hpp>
+//#include <nats-asio/connection.hpp>
+#include <nats-asio/interface.hpp>
+
 
 #include <spdlog/spdlog.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
@@ -10,7 +12,7 @@
 
 #include <iostream>
 
-void main_async(const nats_asio::logger& log, const nats_asio::connection_sptr& conn, nats_asio::ctx ctx)
+void main_async(const nats_asio::logger& log, const nats_asio::iconnection_sptr& conn, nats_asio::ctx ctx)
 {
     uint16_t port = 4222;
     std::string host = "127.0.0.1";
@@ -26,8 +28,8 @@ void main_async(const nats_asio::logger& log, const nats_asio::connection_sptr& 
         log->debug("on new message: subject {}, payload: {}", subject, payload);
     };
 
-    auto sub = conn->subscribe("output", f, ctx);
-    //param.ioc.
+    auto sub = conn->subscribe("output", nullptr, f, ctx);
+
 }
 
 int main()
@@ -40,7 +42,9 @@ int main()
         boost::asio::io_context ioc;
         boost::asio::io_context::work w(ioc);
 
-        auto conn = std::make_shared<nats_asio::connection>(console, ioc);
+
+        auto conn = nats_asio::create_connection(console, ioc);
+
         boost::asio::spawn(ioc, std::bind(&main_async, console, conn,  std::placeholders::_1));
         ioc.run();
     }

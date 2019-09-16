@@ -9,19 +9,22 @@
 
 #include <nlohmann/json.hpp>
 
+
+
 namespace nats_asio {
 
-static const std::string name = "nats-asio";
-static const std::string lang = "cpp";
-static const std::string version = "0.0.1";
-
-struct subscription
+struct subscription: public isubscription
 {
     subscription(uint64_t sid, const on_message_cb& cb)
         : m_sid(sid)
         , m_cb(cb)
     {
     }
+    virtual status unsubscribe() override
+    {
+        return {};
+    }
+
     uint64_t m_sid;
     on_message_cb m_cb;
 };
@@ -56,11 +59,17 @@ const std::map<std::string, mt, std::less<>> message_types_map {
 const std::string rn("\r\n");
 const std::string ping("PING\r\n");
 const std::string pong("PONG\r\n");
-const std::string sub_payload("SUB {} {}\r\n");
-const std::string sub_queue_payload("SUB {} {} {}\r\n");
+
+
+
+//PUB <subject> [reply-to] <#bytes>\r\n[payload]\r\n
 
 std::string connection::prepare_info(const options& o)
 {
+    constexpr auto connect_payload = "CONNECT {}\r\n";
+    constexpr auto name = "nats-asio";
+    constexpr auto lang = "cpp";
+    constexpr auto version = "0.0.1";
 
     using nlohmann::json;
     json j = {
@@ -71,10 +80,11 @@ std::string connection::prepare_info(const options& o)
         {"lang", lang },
         {"user" , o.user},
         {"pass", o.pass },
+        {"version", version},
         {"auth_token" , o.token}
     };
     auto info = j.dump();
-    auto connect_data = fmt::format("CONNECT {} {}", info, rn);
+    auto connect_data = fmt::format(connect_payload, info);
     m_log->debug("sending data on connect {}", info);
     return connect_data;
 }
@@ -83,7 +93,6 @@ uint64_t connection::next_sid()
 {
     return m_sid++;
 }
-
 
 status connection::process_subscription_message(std::string_view v, ctx c)
 {
@@ -124,7 +133,6 @@ status connection::process_subscription_message(std::string_view v, ctx c)
     it->second->m_cb(results[0], &v[p + 3], bytes_n, c);
 
     return {};
-    //MSG <subject> <sid> [reply-to] <#bytes>\r\n[payload]\r\n
 }
 
 status connection::process_message(std::string_view v, ctx c)
@@ -195,10 +203,7 @@ status connection::connect(std::string_view address, uint16_t port, ctx c)
 {
     boost::system::error_code ec;
     m_socket.async_connect(boost::asio::ip::tcp::endpoint(boost::asio::ip::make_address(address), port), c[ec]);
-    if (ec.failed())
-    {
-        return status("connect failed");
-    }
+    if (ec.failed()) return status("connect failed");
     boost::asio::spawn(m_io, std::bind(&connection::run, this, std::placeholders::_1));
     return {};
 }
@@ -249,26 +254,42 @@ void connection::run(ctx c)
     }
 }
 
-status connection::publish(std::string_view subject, const char *raw, std::size_t n, std::optional<std::string> reply_to)
+status connection::publish(std::string_view subject, const char *raw, std::size_t n, std::optional<std::string_view> reply_to, ctx c)
 {
+    constexpr auto pub_header_payload = "PUB {} {} {}\r\n";
+
     return {};
 }
 
-subscription_sptr connection::subscribe_queue(std::string_view subject, std::string_view queue, on_message_cb cb, ctx c)
+//subscription_sptr connection::subscribe_queue(std::string_view subject, std::string_view queue, on_message_cb cb, ctx c)
+//{
+//    return {};
+//}
+
+iconnection_sptr create_connection(const logger& log, aio& io)
 {
-    return {};
+    return std::make_shared<connection>(log, io);
 }
 
 
-std::tuple<subscription_sptr, status> connection::subscribe(std::string_view subject, on_message_cb cb, ctx c)
+std::tuple<isubscription_sptr, status> connection::subscribe(std::string_view subject,  std::optional<std::string_view> queue, on_message_cb cb, ctx c)
 {
+    constexpr auto sub_payload = "SUB {} {} {}\r\n";
     auto sid = next_sid();
-    auto payload = fmt::format(sub_payload, subject, sid);
+    std::string payload;
+    if (queue.has_value())
+    {
+        payload = fmt::format(sub_payload, subject, "", sid);
+    } else
+    {
+        payload = fmt::format(sub_payload, subject, queue.value(), sid);
+    }
+
 
     m_socket.async_write_some(boost::asio::buffer(payload), c[ec]);
     if (ec.failed())
     {
-        return {subscription_sptr(), status(fmt::format("failed to subscribe {}", ec.message()))};
+        return {isubscription_sptr(), status(fmt::format("failed to subscribe {}", ec.message()))};
     }
     m_log->trace("subscribe sent: {}", payload);
 

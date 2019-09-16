@@ -3,6 +3,7 @@
 #include <nats-asio/fwd.hpp>
 #include <nats-asio/defs.hpp>
 #include <nats-asio/common.hpp>
+#include <nats-asio/interface.hpp>
 
 #include <string>
 #include <optional>
@@ -10,23 +11,16 @@
 
 namespace nats_asio {
 
-
-
-
-class connection
+class connection: public iconnection
 {
 public:
     connection(const logger& log, aio& io);
 
-    status connect(std::string_view address, uint16_t port, ctx c);
+    virtual  status connect(std::string_view address, uint16_t port, ctx c) override;
 
-    status publish(std::string_view subject, const char* raw, std::size_t n, std::optional<std::string> reply_to = {});
+    virtual status publish(std::string_view subject, const char* raw, std::size_t n, std::optional<std::string_view> reply_to, ctx c) override;
 
-    std::tuple<subscription_sptr,status> subscribe(std::string_view subject, on_message_cb cb, ctx c);
-
-
-
-    subscription_sptr subscribe_queue(std::string_view subject, std::string_view queue, on_message_cb cb, ctx c);
+    virtual std::tuple<isubscription_sptr,status> subscribe(std::string_view subject,  std::optional<std::string_view> queue, on_message_cb cb, ctx c) override;
 
     void run(ctx c);
 private:

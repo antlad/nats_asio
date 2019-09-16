@@ -52,6 +52,7 @@ set(nats_asio_SRCS
 	"${LINCLUDE}/connection.hpp"
 	"${LINCLUDE}/fwd.hpp"
 	"${LINCLUDE}/structs.hpp"
+	"${LINCLUDE}/interface.hpp"
 	"common.cpp"
 	"connection.cpp"
 	"client.cpp"

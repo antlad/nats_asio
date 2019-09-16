@@ -5,6 +5,7 @@
 namespace nats_asio {
 struct options;
 
+
 struct subscription;
 typedef std::shared_ptr<subscription> subscription_sptr;
 

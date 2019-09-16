@@ -1,6 +1,5 @@
 #include <nats-asio/common.hpp>
 
-
 namespace nats_asio {
 
 detailed_exception::detailed_exception(const std::string& msg, const std::string& file, int line)
@@ -29,6 +28,5 @@ std::string status::error() const
 
     return m_error.value();
 }
-
 
 }
