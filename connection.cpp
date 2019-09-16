@@ -60,9 +60,6 @@ const std::map<std::string, mt, std::less<>> message_types_map {
     {"-ERR", mt::ERR},
     };
 
-//const std::string rn("\r\n");
-//const std::string ping("PING\r\n");
-//PUB <subject> [reply-to] <#bytes>\r\n[payload]\r\n
 
 std::string connection::prepare_info(const options& o)
 {
@@ -115,7 +112,7 @@ status connection::process_subscription_message(std::string_view v, ctx c)
        sid = boost::lexical_cast<uint64_t>(results[1]);
        bytes_n = boost::lexical_cast<uint64_t>(results[bytes_id]);
     } catch (const std::exception& e) {
-        return status(fmt::format("can't parse int in headers: {}", e.what()));
+        return status("can't parse int in headers: {}", e.what());
     }
 
     if (bytes_n > (v.size() - p - 2))
@@ -172,7 +169,7 @@ status connection::process_message(std::string_view v, ctx c)
         m_socket.async_write_some(boost::asio::buffer("PONG\r\n"), c[ec]);
         if (ec.failed())
         {
-            return status(fmt::format("failed to write pong {}", ec.message()));
+            return status("failed to write pong {}", ec.message());
         }
         m_log->trace("pong sent");
         break;
@@ -213,9 +210,6 @@ status connection::connect(std::string_view address, uint16_t port, ctx c)
     boost::asio::spawn(m_io, std::bind(&connection::run, this, std::placeholders::_1));
     return {};
 }
-
-
-
 
 template< size_t N >
 constexpr size_t length( char const (&)[N] )
@@ -284,13 +278,13 @@ status connection::publish(std::string_view subject, const char *raw, std::size_
     m_socket.async_write_some(boost::asio::buffer(header), c[ec]);
     if (ec.failed())
     {
-        return status(fmt::format("write to socket failed {}", ec.message()));
+        return status("write to socket failed {}", ec.message());
     }
 
     m_socket.async_write_some(boost::asio::buffer(raw, n), c[ec]);
     if (ec.failed())
     {
-        return status(fmt::format("write to socket failed {}", ec.message()));
+        return status("write to socket failed {}", ec.message());
     }
 
     return {};
@@ -301,7 +295,7 @@ status connection::unsubscribe(const isubscription_sptr &p, ctx c)
     auto it = m_subs.find(p->sid());
     if (it == m_subs.end())
     {
-        return status(fmt::format("subscription not found {}", p->sid()));
+        return status("subscription not found {}", p->sid());
     }
     m_subs.erase(it);
 
@@ -309,7 +303,7 @@ status connection::unsubscribe(const isubscription_sptr &p, ctx c)
     m_socket.async_write_some(boost::asio::buffer(fmt::format(unsub_payload, p->sid())), c[ec]);
     if (ec.failed())
     {
-        return status(fmt::format("write to socket failed {}", ec.message()));
+        return status("write to socket failed {}", ec.message());
     }
     return {};
 }
@@ -337,7 +331,7 @@ std::tuple<isubscription_sptr, status> connection::subscribe(std::string_view su
     m_socket.async_write_some(boost::asio::buffer(payload), c[ec]);
     if (ec.failed())
     {
-        return {isubscription_sptr(), status(fmt::format("failed to subscribe {}", ec.message()))};
+        return {isubscription_sptr(), status("failed to subscribe {}", ec.message())};
     }
     m_log->trace("subscribe sent: {}", payload);
 
