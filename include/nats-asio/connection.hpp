@@ -14,7 +14,7 @@ namespace nats_asio {
 class connection: public iconnection
 {
 public:
-    connection(const logger& log, aio& io);
+    connection(const logger& log, aio& io, const on_connected_cb& connected_cb, const on_disconnected_cb& disconnected_cb);
 
     virtual void start(std::string_view address, uint16_t port) override;
 
@@ -31,7 +31,7 @@ public:
 private:
     void run(std::string_view address, uint16_t port, ctx c);
 
-    status handle_error();
+    status handle_error(ctx c);
 
     status process_message(std::string_view v, ctx c);
 
@@ -50,6 +50,8 @@ private:
     bool m_stop_flag;
     std::unordered_map<uint64_t, subscription_sptr> m_subs;
     boost::asio::ip::tcp::socket m_socket;
+    on_connected_cb m_connected_cb;
+    on_disconnected_cb m_disconnected_cb;
     boost::system::error_code ec;
 };
 

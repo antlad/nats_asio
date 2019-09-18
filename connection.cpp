@@ -133,7 +133,14 @@ status connection::process_subscription_message(std::string_view v, ctx c)
         m_log->trace("subscribtion canceled {}", sid);
         return unsubscribe(it->second, c);
     }
-    it->second->m_cb(results[0], &v[p + 3], bytes_n, c);
+    if (replty_to)
+    {
+        it->second->m_cb(results[0], results[2], &v[p + 3], bytes_n, c);
+    }
+    else {
+        it->second->m_cb(results[0], nullptr, &v[p + 3], bytes_n, c);
+
+    }
 
     return {};
 }
@@ -168,7 +175,7 @@ status connection::process_message(std::string_view v, ctx c)
         boost::system::error_code ec;
 
         m_socket.async_write_some(boost::asio::buffer("PONG\r\n"), c[ec]);
-        if (auto s = handle_error(); s.failed()) return s;
+        if (auto s = handle_error(c); s.failed()) return s;
         m_log->trace("pong sent");
         break;
     }
@@ -192,13 +199,15 @@ status connection::process_message(std::string_view v, ctx c)
     return {};
 }
 
-connection::connection(const logger &log, aio &io)
+connection::connection(const logger &log, aio &io, const on_connected_cb &connected_cb, const on_disconnected_cb &disconnected_cb)
     : m_sid(0)
     , m_log(log)
     , m_io(io)
     , m_is_connected(false)
     , m_stop_flag(false)
     , m_socket(m_io)
+    , m_connected_cb(connected_cb)
+    , m_disconnected_cb(disconnected_cb)
 {
 }
 
@@ -233,12 +242,12 @@ void connection::run(std::string_view address, uint16_t port, ctx c)
         if (!m_is_connected)
         {
             m_socket.async_connect(boost::asio::ip::tcp::endpoint(boost::asio::ip::make_address(address), port), c[ec]);
-            if (handle_error().failed())
+            if (handle_error(c).failed())
             {
                 continue;
             }
             boost::asio::async_read_until(m_socket, buf, "\r\n", c[ec]);
-            if (auto s = handle_error(); s.failed())
+            if (auto s = handle_error(c); s.failed())
             {
                 m_log->error("read server info failed {}", s.error());
                 continue;
@@ -253,15 +262,21 @@ void connection::run(std::string_view address, uint16_t port, ctx c)
             options o;
             auto info = prepare_info(o);
             m_socket.async_write_some(boost::asio::buffer(info), c[ec]);
-            if (auto s = handle_error(); s.failed())
+            if (auto s = handle_error(c); s.failed())
             {
                 m_log->error("failed to write info {}", s.error());
                 continue;
             }
+            m_is_connected = true;
+
+            if (m_connected_cb != nullptr)
+            {
+                m_connected_cb(*this, c);
+            }
         }
 
         boost::asio::async_read_until(m_socket, buf, "\r\n", c[ec]);
-        if (auto s = handle_error(); s .failed())
+        if (auto s = handle_error(c); s .failed())
         {
             m_log->error("failed to read {}", s.error());
             continue;
@@ -277,14 +292,19 @@ void connection::run(std::string_view address, uint16_t port, ctx c)
     }
 }
 
-status connection::handle_error()
+status connection::handle_error(ctx c)
 {
     if (ec.failed())
     {
         if ((ec == boost::asio::error::eof) || (boost::asio::error::connection_reset == ec))
         {
             m_is_connected = false;
-            m_socket.close();
+            m_socket.close(ec);// TODO: handle it
+
+            if (m_disconnected_cb != nullptr)
+            {
+                m_disconnected_cb(*this, c);
+                }
         }
         return status(ec.message());
     }
@@ -294,6 +314,10 @@ status connection::handle_error()
 
 status connection::publish(std::string_view subject, const char *raw, std::size_t n, std::optional<std::string_view> reply_to, ctx c)
 {
+    if (!m_is_connected)
+    {
+        return status("not connected");
+    }
     constexpr auto pub_header_payload = "PUB {} {} {}\r\n";
     std::string header;
     if (reply_to.has_value())
@@ -306,13 +330,13 @@ status connection::publish(std::string_view subject, const char *raw, std::size_
     }
 
     m_socket.async_write_some(boost::asio::buffer(header), c[ec]);
-    if (auto s = handle_error(); s.failed()) return s;
+    if (auto s = handle_error(c); s.failed()) return s;
 
     m_socket.async_write_some(boost::asio::buffer(raw, n), c[ec]);
-    if (auto s = handle_error(); s.failed()) return s;
+    if (auto s = handle_error(c); s.failed()) return s;
 
     m_socket.async_write_some(boost::asio::buffer("\r\n"), c[ec]);
-    if (auto s = handle_error(); s.failed()) return s;
+    if (auto s = handle_error(c); s.failed()) return s;
 
     return {};
 }
@@ -328,17 +352,22 @@ status connection::unsubscribe(const isubscription_sptr &p, ctx c)
 
     constexpr auto unsub_payload = "UNSUB {}\r\n";
     m_socket.async_write_some(boost::asio::buffer(fmt::format(unsub_payload, p->sid())), c[ec]);
-    if (auto s = handle_error(); s.failed()) return s;
+    if (auto s = handle_error(c); s.failed()) return s;
     return {};
 }
 
-iconnection_sptr create_connection(const logger& log, aio& io)
+iconnection_sptr create_connection(const logger& log, aio& io, const on_connected_cb& connected_cb, const on_disconnected_cb& disconnected_cb)
 {
-    return std::make_shared<connection>(log, io);
+    return std::make_shared<connection>(log, io, connected_cb, disconnected_cb);
 }
 
 std::tuple<isubscription_sptr, status> connection::subscribe(std::string_view subject,  std::optional<std::string_view> queue, on_message_cb cb, ctx c)
 {
+    if (!m_is_connected)
+    {
+        return  {isubscription_sptr(), status("not connected")};
+    }
+
     constexpr auto sub_payload = "SUB {} {} {}\r\n";
     auto sid = next_sid();
     std::string payload;
@@ -352,7 +381,7 @@ std::tuple<isubscription_sptr, status> connection::subscribe(std::string_view su
     }
 
     m_socket.async_write_some(boost::asio::buffer(payload), c[ec]);
-    if (auto s = handle_error(); s.failed())
+    if (auto s = handle_error(c); s.failed())
     {
         return {isubscription_sptr(), s};
     }

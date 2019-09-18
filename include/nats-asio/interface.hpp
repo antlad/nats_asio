@@ -15,6 +15,7 @@ struct isubscription{
     virtual void cancel() = 0;
 };
 
+
 struct iconnection;
 
 typedef std::shared_ptr<isubscription> isubscription_sptr;
@@ -40,9 +41,9 @@ struct iconnection {
 };
 typedef std::shared_ptr<iconnection> iconnection_sptr;
 
-typedef std::function<void()> on_connected_cb;
-typedef std::function<void()> on_disconnected_cb;
+typedef std::function<void(iconnection&, ctx)> on_connected_cb;
+typedef std::function<void(iconnection&, ctx)> on_disconnected_cb;
 
-iconnection_sptr create_connection(const logger& log, aio& io);
+iconnection_sptr create_connection(const logger& log, aio& io, const on_connected_cb& connected_cb, const on_disconnected_cb& disconnected_cb);
 
 }
