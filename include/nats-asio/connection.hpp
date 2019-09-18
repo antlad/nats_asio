@@ -16,7 +16,11 @@ class connection: public iconnection
 public:
     connection(const logger& log, aio& io);
 
-    virtual  status connect(std::string_view address, uint16_t port, ctx c) override;
+    virtual void start(std::string_view address, uint16_t port) override;
+
+    virtual void stop() override;
+
+    virtual bool is_connected() override;
 
     virtual status publish(std::string_view subject, const char* raw, std::size_t n, std::optional<std::string_view> reply_to, ctx c) override;
 
@@ -24,8 +28,10 @@ public:
 
     virtual std::tuple<isubscription_sptr,status> subscribe(std::string_view subject,  std::optional<std::string_view> queue, on_message_cb cb, ctx c) override;
 
-    void run(ctx c);
 private:
+    void run(std::string_view address, uint16_t port, ctx c);
+
+    status handle_error();
 
     status process_message(std::string_view v, ctx c);
 
@@ -40,6 +46,8 @@ private:
     logger m_log;
     aio& m_io;
 
+    bool m_is_connected;
+    bool m_stop_flag;
     std::unordered_map<uint64_t, subscription_sptr> m_subs;
     boost::asio::ip::tcp::socket m_socket;
     boost::system::error_code ec;

@@ -19,6 +19,7 @@ struct subscription: public isubscription
         , m_sid(sid)
     {
     }
+
     virtual void cancel() override
     {
         m_cancel = true;
@@ -167,10 +168,7 @@ status connection::process_message(std::string_view v, ctx c)
         boost::system::error_code ec;
 
         m_socket.async_write_some(boost::asio::buffer("PONG\r\n"), c[ec]);
-        if (ec.failed())
-        {
-            return status("failed to write pong {}", ec.message());
-        }
+        if (auto s = handle_error(); s.failed()) return s;
         m_log->trace("pong sent");
         break;
     }
@@ -198,68 +196,100 @@ connection::connection(const logger &log, aio &io)
     : m_sid(0)
     , m_log(log)
     , m_io(io)
+    , m_is_connected(false)
+    , m_stop_flag(false)
     , m_socket(m_io)
 {
 }
 
-status connection::connect(std::string_view address, uint16_t port, ctx c)
+void connection::stop()
 {
-    boost::system::error_code ec;
-    m_socket.async_connect(boost::asio::ip::tcp::endpoint(boost::asio::ip::make_address(address), port), c[ec]);
-    if (ec.failed()) return status("connect failed");
-    boost::asio::spawn(m_io, std::bind(&connection::run, this, std::placeholders::_1));
-    return {};
+    m_stop_flag = true;
 }
 
-template< size_t N >
-constexpr size_t length( char const (&)[N] )
+bool connection::is_connected()
 {
-    return N-1;
+    return m_is_connected;
 }
 
-void connection::run(ctx c)
+void connection::start(std::string_view address, uint16_t port)
+{
+    boost::asio::spawn(m_io, std::bind(&connection::run, this, address, port, std::placeholders::_1));
+}
+
+void connection::run(std::string_view address, uint16_t port, ctx c)
 {
     std::string data;
     boost::asio::dynamic_string_buffer buf(data);
 
-    boost::asio::async_read_until(m_socket, buf, "\r\n", c[ec]);
-
-    if (ec.failed())
-    {
-        m_log->error("connect failed {}", ec.message());
-        return;
-    }
-
-    auto s = process_message(data, c);
-    if (s.failed())
-    {
-        m_log->error("process message failed with error: {}", s.error());
-    }
-    buf.consume(data.size());
-
-    m_socket.async_write_some(boost::asio::buffer("PING\r\n"), c[ec]);
-    if (ec.failed())
-    {
-        m_log->error("failed to write pong {}", ec.message());
-    }
-
     for(;;)
     {
-        boost::asio::async_read_until(m_socket, buf, "\r\n", c[ec]);
-
-        if (ec.failed())
+        if (m_stop_flag)
         {
-            m_log->error("connect failed {}", ec.message());
+            m_log->debug("stopping main connection loop");
             return;
         }
+
+        if (!m_is_connected)
+        {
+            m_socket.async_connect(boost::asio::ip::tcp::endpoint(boost::asio::ip::make_address(address), port), c[ec]);
+            if (handle_error().failed())
+            {
+                continue;
+            }
+            boost::asio::async_read_until(m_socket, buf, "\r\n", c[ec]);
+            if (auto s = handle_error(); s.failed())
+            {
+                m_log->error("read server info failed {}", s.error());
+                continue;
+            }
+
+            auto s = process_message(data, c);
+            if (s.failed())
+            {
+                m_log->error("process message failed with error: {}", s.error());
+            }
+            buf.consume(data.size());
+            options o;
+            auto info = prepare_info(o);
+            m_socket.async_write_some(boost::asio::buffer(info), c[ec]);
+            if (auto s = handle_error(); s.failed())
+            {
+                m_log->error("failed to write info {}", s.error());
+                continue;
+            }
+        }
+
+        boost::asio::async_read_until(m_socket, buf, "\r\n", c[ec]);
+        if (auto s = handle_error(); s .failed())
+        {
+            m_log->error("failed to read {}", s.error());
+            continue;
+        }
+
         m_log->trace("read done");
-        s = process_message(data, c);
+        auto s = process_message(data, c);
         if (s.failed())
         {
             m_log->error("process message failed with error: {}", s.error());
         }
         buf.consume(data.size());
     }
+}
+
+status connection::handle_error()
+{
+    if (ec.failed())
+    {
+        if ((ec == boost::asio::error::eof) || (boost::asio::error::connection_reset == ec))
+        {
+            m_is_connected = false;
+            m_socket.close();
+        }
+        return status(ec.message());
+    }
+
+    return {};
 }
 
 status connection::publish(std::string_view subject, const char *raw, std::size_t n, std::optional<std::string_view> reply_to, ctx c)
@@ -276,16 +306,13 @@ status connection::publish(std::string_view subject, const char *raw, std::size_
     }
 
     m_socket.async_write_some(boost::asio::buffer(header), c[ec]);
-    if (ec.failed())
-    {
-        return status("write to socket failed {}", ec.message());
-    }
+    if (auto s = handle_error(); s.failed()) return s;
 
     m_socket.async_write_some(boost::asio::buffer(raw, n), c[ec]);
-    if (ec.failed())
-    {
-        return status("write to socket failed {}", ec.message());
-    }
+    if (auto s = handle_error(); s.failed()) return s;
+
+    m_socket.async_write_some(boost::asio::buffer("\r\n"), c[ec]);
+    if (auto s = handle_error(); s.failed()) return s;
 
     return {};
 }
@@ -301,10 +328,7 @@ status connection::unsubscribe(const isubscription_sptr &p, ctx c)
 
     constexpr auto unsub_payload = "UNSUB {}\r\n";
     m_socket.async_write_some(boost::asio::buffer(fmt::format(unsub_payload, p->sid())), c[ec]);
-    if (ec.failed())
-    {
-        return status("write to socket failed {}", ec.message());
-    }
+    if (auto s = handle_error(); s.failed()) return s;
     return {};
 }
 
@@ -327,11 +351,10 @@ std::tuple<isubscription_sptr, status> connection::subscribe(std::string_view su
         payload = fmt::format(sub_payload, subject, "", sid);
     }
 
-
     m_socket.async_write_some(boost::asio::buffer(payload), c[ec]);
-    if (ec.failed())
+    if (auto s = handle_error(); s.failed())
     {
-        return {isubscription_sptr(), status("failed to subscribe {}", ec.message())};
+        return {isubscription_sptr(), s};
     }
     m_log->trace("subscribe sent: {}", payload);
 
