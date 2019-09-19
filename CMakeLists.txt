@@ -7,7 +7,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
-option(ENABLE_TESTS "enable tests" OFF)
+option(ENABLE_TESTS "enable tests" ON)
 
 #add_definitions(-DSPDLOG_FMT_EXTERNAL)
 
@@ -52,9 +52,11 @@ set(nats_asio_SRCS
 	"${LINCLUDE}/fwd.hpp"
 	"${LINCLUDE}/structs.hpp"
 	"${LINCLUDE}/interface.hpp"
+	"${LINCLUDE}/parser.hpp"
 	"common.cpp"
 	"connection.cpp"
 	"structs.cpp"
+	"parser.cpp"
 )
 
 
@@ -69,13 +71,15 @@ target_link_libraries(nats_asio_check  pthread nats_asio "${Boost_COROUTINE_LIBR
 #        include_directories(${GTEST_INCLUDE_DIRS})
 #endif()
 
-#if (ENABLE_TESTS)
-    #enable_testing()
-#	find_package(GTest REQUIRED)
-    #include_directories(${GTEST_INCLUDE_DIRS})
-#	add_executable(default_test_suite unit_tests/check1.cpp)
-    #target_link_libraries(default_test_suite GTest::GTest GTest::Main)
-#	add_test(DefaultTestSuite default_test_suite)
-#endif()
+if (ENABLE_TESTS)
+	enable_testing()
+	find_package(GTest REQUIRED)
+	get_filename_component(GTEST_LIB_FOLDER ${GTEST_LIBRARY} DIRECTORY)
+	include_directories(${GTEST_INCLUDE_DIRS})
+	link_directories(${GTEST_LIB_FOLDER})
+	add_executable(parser_test check1.cpp)
+	target_link_libraries(parser_test GTest::GTest GTest::Main gmock gmock_main nats_asio fmt::fmt)
+	add_test(DefaultTestSuite default_test_suite)
+endif()
 
 
