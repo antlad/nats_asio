@@ -4,6 +4,7 @@
 #include <nats-asio/defs.hpp>
 #include <nats-asio/common.hpp>
 #include <nats-asio/interface.hpp>
+#include <nats-asio/parser.hpp>
 
 #include <string>
 #include <optional>
@@ -11,7 +12,9 @@
 
 namespace nats_asio {
 
-class connection: public iconnection
+class connection
+    : public iconnection
+    , public parser_observer
 {
 public:
     connection(const logger& log, aio& io, const on_connected_cb& connected_cb, const on_disconnected_cb& disconnected_cb);
@@ -29,13 +32,23 @@ public:
     virtual std::tuple<isubscription_sptr,status> subscribe(std::string_view subject,  std::optional<std::string_view> queue, on_message_cb cb, ctx c) override;
 
 private:
-    //status socket_write(const char* raw, std::size_t n, ctx c);
+    virtual void on_ping(ctx c) override;
+
+    virtual void on_pong(ctx c) override;
+
+    virtual void on_ok(ctx c) override;
+
+    virtual void on_error(std::string_view err, ctx c) override;
+
+    virtual void on_info(std::string_view info, ctx c) override;
+
+    virtual void on_message(std::string_view subject, std::string_view sid, std::optional<std::string_view> reply_to, const char* raw, std::size_t n, ctx c) override;
 
     void run(std::string_view address, uint16_t port, ctx c);
 
     status handle_error(ctx c);
 
-    std::tuple<std::size_t, status> process_message(std::string_view v, ctx c);
+    //std::tuple<std::size_t, status> process_message(std::string_view v, ctx c);
 
     status process_subscription_message(std::string_view v, ctx c);
 

@@ -21,6 +21,7 @@ int main()
         console->set_level(spdlog::level::trace);
 
         boost::asio::io_context ioc;
+
         boost::asio::io_context::work w(ioc);
         auto conn = nats_asio::create_connection(console, ioc,[&console](nats_asio::iconnection& c, nats_asio::ctx ctx){
                 console->info("on connected");

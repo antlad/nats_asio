@@ -6,6 +6,7 @@
 #include <boost/asio/read_until.hpp>
 #include <boost/algorithm/string.hpp>
 #include <boost/lexical_cast.hpp>
+#include <boost/circular_buffer/space_optimized.hpp>
 
 #include <nlohmann/json.hpp>
 
@@ -34,33 +35,6 @@ struct subscription: public isubscription
     on_message_cb m_cb;
     uint64_t m_sid;
 };
-
-enum class mt {
-    INFO,
-    CONNECT,
-    PUB,
-    SUB,
-    UNSUB,
-    MSG,
-    PING,
-    PONG,
-    OK,
-    ERR
-};
-
-const std::map<std::string, mt, std::less<>> message_types_map {
-    {"INFO", mt::INFO},
-    {"CONNECT", mt::CONNECT},
-    {"PUB", mt::PUB},
-    {"SUB", mt::SUB},
-    {"UNSUB", mt::UNSUB},
-    {"MSG", mt::MSG},
-    {"PING", mt::PING},
-    {"PONG", mt::PONG},
-    {"+OK", mt::OK},
-    {"-ERR", mt::ERR},
-    };
-
 
 std::string connection::prepare_info(const options& o)
 {
@@ -92,122 +66,6 @@ uint64_t connection::next_sid()
     return m_sid++;
 }
 
-status connection::process_subscription_message(std::string_view v, ctx c)
-{
-    std::vector<std::string> results;
-    auto p = v.find("\r\n") - 1;
-    auto info = v.substr(1, p);
-
-    boost::split(results, info, [](char c){return c == ' ';});
-
-    if (results.size() < 3 || results.size() > 4)
-    {
-        return status("unexpected message format");
-    }
-    bool replty_to = results.size() == 4;
-    std::size_t bytes_id = replty_to ? 3 : 2;
-
-    std::size_t sid = 0;
-    std::size_t bytes_n = 0;
-    try {
-       sid = boost::lexical_cast<uint64_t>(results[1]);
-       bytes_n = boost::lexical_cast<uint64_t>(results[bytes_id]);
-    } catch (const std::exception& e) {
-        return status("can't parse int in headers: {}", e.what());
-    }
-
-    if (bytes_n > (v.size() - p - 2))
-    {
-        return status("unexpected bytes count");
-    }
-
-    auto it = m_subs.find(sid);
-    if (it == m_subs.end())
-    {
-        m_log->trace("dropping message because subscription not found: topic: {}, sid: {}", results[0], results[1]);
-        return {};
-    }
-
-    if (it->second->m_cancel)
-    {
-        m_log->trace("subscribtion canceled {}", sid);
-        return unsubscribe(it->second, c);
-    }
-    if (replty_to)
-    {
-        it->second->m_cb(results[0], results[2], &v[p + 3], bytes_n, c);
-    }
-    else {
-        it->second->m_cb(results[0], nullptr, &v[p + 3], bytes_n, c);
-
-    }
-
-    return {};
-}
-
-std::tuple<std::size_t, status> connection::process_message(std::string_view all, ctx c)
-{
-    auto end_p = all.find("\r\n");
-    if (end_p == std::string_view::npos)
-    {
-        return {0, status("can't find end")};
-    }
-    auto v = std::string_view(all.substr(0, end_p));
-    auto p = v.find_first_of(" ");
-    if (p == std::string_view::npos)
-    {
-        return {0, status("protocol violation from server")};
-    }
-
-    auto it = message_types_map.find(v.substr(0, p));
-    if (it == message_types_map.end())
-    {
-        return {0, status("unknown message")};
-    }
-    switch (it->second)
-    {
-    case mt::INFO:{
-        using nlohmann::json;
-        auto j = json::parse(v.substr(p,v.size() - p));
-        m_log->debug("got info {}", j.dump());
-        m_max_payload = j["max_payload"].get<std::size_t>();
-        m_log->trace("info recived and parsed");
-        break;
-    }
-    case mt::MSG:{
-
-
-        return {0, process_subscription_message(v.substr(p,v.size() - p), c)};
-    }
-    case mt::PING:{
-        m_log->trace("ping recived");
-        boost::system::error_code ec;
-
-        constexpr std::string_view pong = "PONG\r\n";
-        boost::asio::async_write(m_socket, boost::asio::buffer(pong), boost::asio::transfer_exactly(pong.size()),  c[ec]);
-        if (auto s = handle_error(c); s.failed()) return {0, s};
-        m_log->trace("pong sent");
-        break;
-    }
-    case mt::PONG:{
-        m_log->trace("pong recived");
-        break;
-    }
-    case mt::OK:{
-         m_log->trace("ok recived");
-        break;
-    }
-    case mt::ERR:{
-        m_log->error("error message from server {}", v.substr(p,v.size() - p));
-        break;
-    }
-    default:{
-        return {0, status("unexpected message type")};
-    }
-    }
-
-    return {0, {}};
-}
 
 connection::connection(const logger &log, aio &io, const on_connected_cb &connected_cb, const on_disconnected_cb &disconnected_cb)
     : m_sid(0)
@@ -264,12 +122,14 @@ void connection::run(std::string_view address, uint16_t port, ctx c)
                 continue;
             }
 
-            auto [consumed, s] = process_message(data, c);
+            auto [consumed, s] = parse_message(data, this, c);
             if (s.failed())
             {
                 m_log->error("process message failed with error: {}", s.error());
+                buf.consume(consumed);
+                continue;
             }
-            buf.consume(data.size());
+            buf.consume(consumed);
 
             options o;
             auto info = prepare_info(o);
@@ -291,22 +151,21 @@ void connection::run(std::string_view address, uint16_t port, ctx c)
 
 
         boost::asio::async_read_until(m_socket, buf, "\r\n", c[ec]);
-
         if (auto s = handle_error(c); s .failed())
         {
             m_log->error("failed to read {}", s.error());
-            //buf.consume(data.size());
+            buf.consume(data.size());
             continue;
         }
 
         m_log->trace("read done");
-        auto [consumed, s] = process_message(data, c);
+
+        auto [consumed, s] = parse_message(data, this, c);
         if (s.failed())
         {
             m_log->error("process message failed with error: {}", s.error());
         }
-        buf.consume(data.size());
-
+        buf.consume(consumed);
     }
 }
 
@@ -413,19 +272,75 @@ std::tuple<isubscription_sptr, status> connection::subscribe(std::string_view su
     return {sub, {}};
 }
 
-//status connection::socket_write(const char *raw, std::size_t n, ctx c)
-//{
+void connection::on_ping(ctx c)
+{
+    m_log->trace("ping recived");
+    boost::system::error_code ec;
+    constexpr std::string_view pong = "PONG\r\n";
+    boost::asio::async_write(m_socket, boost::asio::buffer(pong), boost::asio::transfer_exactly(pong.size()),  c[ec]);
+    handle_error(c);
+}
 
+void connection::on_pong(ctx)
+{
+    m_log->trace("pong recived");
+}
 
-//    ;
-//    for (std::size_t i = 0; i < m_max_attempts; i++)
-//    {
+void connection::on_ok(ctx)
+{
+    m_log->trace("ok recived");
+}
 
-//    }
+void connection::on_error(std::string_view err, ctx)
+{
+    m_log->error("error message from server {}", err);
+}
 
+void connection::on_info(std::string_view info, ctx)
+{
+    using nlohmann::json;
+    auto j = json::parse(info);
+    m_log->debug("got info {}", j.dump());
+    m_max_payload = j["max_payload"].get<std::size_t>();
+    m_log->trace("info recived and parsed");
+}
 
-//    return status;
-//}
+void connection::on_message(std::string_view subject, std::string_view sid_str, std::optional<std::string_view> reply_to, const char *raw, std::size_t n, ctx c)
+{
+    std::size_t sid = 0;
+    try {
+        sid = boost::lexical_cast<uint64_t>(sid_str);
+    } catch (const std::exception& e) {
+        m_log->error("can't parse sid: {}", e.what());
+        return;
+    }
+
+    auto it = m_subs.find(sid);
+    if (it == m_subs.end())
+    {
+        m_log->trace("dropping message because subscription not found: topic: {}, sid: {}", subject, sid_str);
+        return;
+    }
+
+    if (it->second->m_cancel)
+    {
+        m_log->trace("subscribtion canceled {}", sid);
+        auto s = unsubscribe(it->second, c);
+        if (s.failed())
+        {
+            m_log->error("unsubscribe failed: {}", s.error());
+        }
+    }
+
+    if (reply_to.has_value())
+    {
+        it->second->m_cb(subject, reply_to, raw, n, c);
+    }
+    else
+    {
+        it->second->m_cb(subject, nullptr, raw, n, c);
+    }
+}
 
 }
 

@@ -32,12 +32,6 @@ include_directories(
 		"${OPENSSL_INCLUDE_DIR}"
 		)
 
-
-#find_package(FMT REQUIRED)
-#find_package(spdlog REQUIRED)
-#find_package(FlatBuffers REQUIRED)
-#find_package(gRPC REQUIRED)
-
 set(LINCLUDE "${CMAKE_CURRENT_LIST_DIR}/include/nats-asio" )
 
 include_directories(
@@ -65,12 +59,6 @@ add_executable(nats_asio_check main.cpp)
 
 target_link_libraries(nats_asio_check  pthread nats_asio "${Boost_COROUTINE_LIBRARIES}" OpenSSL::Crypto OpenSSL::SSL fmt::fmt)
 
-#if (ENABLE_TESTS)
-#        enable_testing()
-#        find_package(GTest REQUIRED)
-#        include_directories(${GTEST_INCLUDE_DIRS})
-#endif()
-
 if (ENABLE_TESTS)
 	enable_testing()
 	find_package(GTest REQUIRED)
@@ -78,7 +66,7 @@ if (ENABLE_TESTS)
 	include_directories(${GTEST_INCLUDE_DIRS})
 	link_directories(${GTEST_LIB_FOLDER})
 	add_executable(parser_test check1.cpp)
-	target_link_libraries(parser_test GTest::GTest GTest::Main gmock gmock_main nats_asio fmt::fmt)
+	target_link_libraries(parser_test GTest::GTest GTest::Main gmock gmock_main nats_asio "${Boost_COROUTINE_LIBRARIES}" OpenSSL::Crypto OpenSSL::SSL fmt::fmt)
 	add_test(DefaultTestSuite default_test_suite)
 endif()
 
