@@ -59,9 +59,10 @@ std::vector<std::string_view> split_sv(std::string_view str, std::string_view de
 
 std::tuple<std::size_t, status> parse_message(std::string_view v, parser_observer *observer, ctx c)
 {
+    constexpr std::string_view delimiter = "\r\n";
     auto p = v.find_first_of(" \r\n");
-    auto end_p = v.find("\r\n", p);
-    auto end_size = end_p + 2;
+    auto end_p = v.find(delimiter, p);
+    auto end_size = end_p + delimiter.size();
     if (p == std::string_view::npos || end_p == std::string_view::npos)
     {
         return {0, {"protocol violation from server"}};
@@ -101,12 +102,12 @@ std::tuple<std::size_t, status> parse_message(std::string_view v, parser_observe
             return {0, {"can't parse int in headers: {}", e.what()}};
         }
 
-        if ((end_size + bytes_n + 2) > v.size())
+        if ((end_size + bytes_n + delimiter.size()) > v.size())
         {
             return {0, {"payload not yet in buffer"}};
         }
 
-        const char * raw = &v[end_p + 2];
+        const char * raw = &v[end_p + delimiter.size()];
         if (replty_to)
         {
              observer->on_message(results[0], results[1],  results[2], raw, bytes_n, c);
@@ -116,7 +117,7 @@ std::tuple<std::size_t, status> parse_message(std::string_view v, parser_observe
             observer->on_message(results[0], results[1],  std::optional<std::string_view>(), raw, bytes_n, c);
         }
 
-        return {end_size + bytes_n + 2, {}};
+        return {end_size + bytes_n + delimiter.size(), {}};
     }
     case mt::PING:{
         observer->on_ping(c);

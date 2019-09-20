@@ -6,7 +6,6 @@
 #include <boost/asio/read_until.hpp>
 #include <boost/algorithm/string.hpp>
 #include <boost/lexical_cast.hpp>
-#include <boost/circular_buffer/space_optimized.hpp>
 
 #include <nlohmann/json.hpp>
 

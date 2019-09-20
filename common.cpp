@@ -6,7 +6,7 @@ detailed_exception::detailed_exception(const std::string& msg, const std::string
     : m_msg(fmt::format("exception:{}, file: {}, line: {}", msg, file, line))
 {}
 
-const char* detailed_exception::what() const _GLIBCXX_USE_NOEXCEPT
+const char* detailed_exception::what() const noexcept
 {
     return m_msg.c_str();
 }

@@ -34,7 +34,7 @@ public:
 
     detailed_exception(const std::string& msg , const std::string& file, int line);
 
-    virtual const char* what() const _GLIBCXX_USE_NOEXCEPT override;
+    virtual const char* what() const noexcept override;
 private:
     std::string m_msg;
 };

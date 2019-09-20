@@ -151,7 +151,7 @@ TEST(payload_messages, on_message_binary)
 
     EXPECT_CALL(m, on_message(subject, sid, std::optional<std::string_view>(), testing::_, msg_size, testing::_)).Times(1);
     async_process([&](auto c){
-        auto [n1, s1] = parse_message(&buffer[0], &m, c);
+        auto [n1, s1] = parse_message(std::string_view(&buffer[0], buffer.size()), &m, c);
         EXPECT_EQ(false, s1.failed());
         EXPECT_EQ(n1, buffer.size());
     });
