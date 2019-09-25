@@ -50,7 +50,7 @@ private:
 
     //std::tuple<std::size_t, status> process_message(std::string_view v, ctx c);
 
-    status process_subscription_message(std::string_view v, ctx c);
+    //status process_subscription_message(std::string_view v, ctx c);
 
     std::string prepare_info(const options &o);
 

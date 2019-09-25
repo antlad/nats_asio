@@ -27,6 +27,7 @@ int main()
                 console->info("on connected");
                auto [sub, s] = c.subscribe("output", nullptr, [&console](std::string_view , std::optional<std::string_view>, const char* raw, std::size_t n, nats_asio::ctx ){
                         std::string_view view(raw, n);
+                        
                         console->info("on new message:  {}", view);
                     }, ctx);
                if (s.failed())
@@ -39,12 +40,11 @@ int main()
             });
 
         conn->start("127.0.0.1", 4222);
-
         ioc.run();
     }
     catch (const std::exception& e)
     {
-        std::cout << "unhadled exception " << e.what() << std::endl;
+        std::cout << "unhandled exception " << e.what() << std::endl;
     }
 
     return 0;

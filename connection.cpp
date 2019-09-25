@@ -4,6 +4,7 @@
 #include <boost/asio/ip/tcp.hpp>
 #include <boost/asio/buffer.hpp>
 #include <boost/asio/read_until.hpp>
+#include <boost/asio/read.hpp>
 #include <boost/algorithm/string.hpp>
 #include <boost/lexical_cast.hpp>
 
@@ -20,15 +21,9 @@ struct subscription: public isubscription
     {
     }
 
-    virtual void cancel() override
-    {
-        m_cancel = true;
-    }
+    virtual void cancel() override;
 
-    virtual uint64_t sid() override
-    {
-        return m_sid;
-    }
+    virtual uint64_t sid() override;
 
     bool m_cancel;
     on_message_cb m_cb;
@@ -41,18 +36,18 @@ std::string connection::prepare_info(const options& o)
     constexpr auto name = "nats-asio";
     constexpr auto lang = "cpp";
     constexpr auto version = "0.0.1";
-
     using nlohmann::json;
-    json j = {
+    json j =
+    {
         {"verbose", o.verbose ? true : false},
-        {"pedantic" , o.pedantic ? true : false},
-        {"ssl_required" , o.ssl_required ? true : false},
-        {"name" , name },
+        {"pedantic", o.pedantic ? true : false},
+        {"ssl_required", o.ssl_required ? true : false},
+        {"name", name },
         {"lang", lang },
-        {"user" , o.user},
+        {"user", o.user},
         {"pass", o.pass },
         {"version", version},
-        {"auth_token" , o.token}
+        {"auth_token", o.token}
     };
     auto info = j.dump();
     auto connect_data = fmt::format(connect_payload, info);
@@ -66,7 +61,7 @@ uint64_t connection::next_sid()
 }
 
 
-connection::connection(const logger &log, aio &io, const on_connected_cb &connected_cb, const on_disconnected_cb &disconnected_cb)
+connection::connection(const logger& log, aio& io, const on_connected_cb& connected_cb, const on_disconnected_cb& disconnected_cb)
     : m_sid(0)
     , m_log(log)
     , m_io(io)
@@ -93,12 +88,16 @@ void connection::start(std::string_view address, uint16_t port)
     boost::asio::spawn(m_io, std::bind(&connection::run, this, address, port, std::placeholders::_1));
 }
 
+
 void connection::run(std::string_view address, uint16_t port, ctx c)
 {
+    std::size_t prev_consumed = 0;
+    //    std::string data;
     std::string data;
-    boost::asio::dynamic_string_buffer buf(data);
+    //    m_max_payload = 1024 * 1024;//TODO: move it to constructor
+    data.reserve(m_max_payload);
 
-    for(;;)
+    for (;;)
     {
         if (m_stop_flag)
         {
@@ -109,30 +108,33 @@ void connection::run(std::string_view address, uint16_t port, ctx c)
         if (!m_is_connected)
         {
             m_socket.async_connect(boost::asio::ip::tcp::endpoint(boost::asio::ip::make_address(address), port), c[ec]);
+
             if (handle_error(c).failed())
             {
                 continue;
             }
-            boost::asio::async_read_until(m_socket, buf, "\r\n", c[ec]);
+
+            boost::asio::async_read_until(m_socket, boost::asio::dynamic_buffer(data, m_max_payload), "\r\n", c[ec]);
+
             if (auto s = handle_error(c); s.failed())
             {
                 m_log->error("read server info failed {}", s.error());
-                buf.consume(data.size());
+                data.resize(0);
                 continue;
             }
 
             auto [consumed, s] = parse_message(data, this, c);
+            data.resize(data.size() - consumed);
+
             if (s.failed())
             {
                 m_log->error("process message failed with error: {}", s.error());
-                buf.consume(consumed);
                 continue;
             }
-            buf.consume(consumed);
 
+            data.reserve(m_max_payload);
             options o;
             auto info = prepare_info(o);
-
             boost::asio::async_write(m_socket, boost::asio::buffer(info), boost::asio::transfer_exactly(info.size()),  c[ec]);
 
             if (auto s = handle_error(c); s.failed())
@@ -140,6 +142,7 @@ void connection::run(std::string_view address, uint16_t port, ctx c)
                 m_log->error("failed to write info {}", s.error());
                 continue;
             }
+
             m_is_connected = true;
 
             if (m_connected_cb != nullptr)
@@ -148,23 +151,38 @@ void connection::run(std::string_view address, uint16_t port, ctx c)
             }
         }
 
+        if (data.size() != 0 && prev_consumed == 0)
+        {
+            //            auto pre_size = data.size();
+            //            std::size_t step = 1024;
+            //            data.resize(pre_size + step);
+            //m_socket.async_read_some(boost::asio::buffer(&data[pre_size - 1], step), c[ec]);
+            m_socket.async_read_some(boost::asio::dynamic_buffer(data, m_max_payload), c[ec]);
+        }
+        else
+        {
+            boost::asio::async_read_until(m_socket, boost::asio::dynamic_buffer(data, m_max_payload), "\r\n", c[ec]);
+        }
 
-        boost::asio::async_read_until(m_socket, buf, "\r\n", c[ec]);
-        if (auto s = handle_error(c); s .failed())
+        if (auto s = handle_error(c); s.failed())
         {
             m_log->error("failed to read {}", s.error());
-            buf.consume(data.size());
+            data.resize(0);
+            //b.consume(data.size());
             continue;
         }
 
         m_log->trace("read done");
-
         auto [consumed, s] = parse_message(data, this, c);
+        data.resize(data.size() - consumed);
+
         if (s.failed())
         {
             m_log->error("process message failed with error: {}", s.error());
         }
-        buf.consume(consumed);
+
+        // b.consume(consumed);
+        prev_consumed = consumed;
     }
 }
 
@@ -182,27 +200,29 @@ status connection::handle_error(ctx c)
                 m_disconnected_cb(*this, c);
             }
         }
+
         return status(ec.message());
     }
 
     return {};
 }
 
-status connection::publish(std::string_view subject, const char *raw, std::size_t n, std::optional<std::string_view> reply_to, ctx c)
+status connection::publish(std::string_view subject, const char* raw, std::size_t n, std::optional<std::string_view> reply_to, ctx c)
 {
     if (!m_is_connected)
     {
         return status("not connected");
     }
+
     constexpr std::string_view pub_header_payload = "PUB {} {} {}\r\n";
     std::vector<boost::asio::const_buffer> buffers;
-
     std::string header;
+
     if (reply_to.has_value())
     {
         header = fmt::format(pub_header_payload, subject, reply_to.value(), n);
-
-    } else
+    }
+    else
     {
         header = fmt::format(pub_header_payload, subject, "", n);
     }
@@ -210,27 +230,35 @@ status connection::publish(std::string_view subject, const char *raw, std::size_
     buffers.push_back(boost::asio::buffer(header));
     buffers.push_back(boost::asio::buffer(raw, n));
     buffers.push_back(boost::asio::buffer("\r\n"));
-
     std::size_t total_size = header.size() + n + 4;
-
     boost::asio::async_write(m_socket, buffers, boost::asio::transfer_exactly(total_size),  c[ec]);
-    if (auto s = handle_error(c); s.failed()) return s;
+
+    if (auto s = handle_error(c); s.failed())
+    {
+        return s;
+    }
 
     return {};
 }
 
-status connection::unsubscribe(const isubscription_sptr &p, ctx c)
+status connection::unsubscribe(const isubscription_sptr& p, ctx c)
 {
     auto it = m_subs.find(p->sid());
+
     if (it == m_subs.end())
     {
         return status("subscription not found {}", p->sid());
     }
-    m_subs.erase(it);
 
+    m_subs.erase(it);
     constexpr std::string_view unsub_payload = "UNSUB {}\r\n";
     boost::asio::async_write(m_socket, boost::asio::buffer(unsub_payload), boost::asio::transfer_exactly(unsub_payload.size()),  c[ec]);
-    if (auto s = handle_error(c); s.failed()) return s;
+
+    if (auto s = handle_error(c); s.failed())
+    {
+        return s;
+    }
+
     return {};
 }
 
@@ -249,25 +277,26 @@ std::tuple<isubscription_sptr, status> connection::subscribe(std::string_view su
     constexpr std::string_view sub_payload = "SUB {} {} {}\r\n";
     auto sid = next_sid();
     std::string payload;
+
     if (queue.has_value())
     {
         payload = fmt::format(sub_payload, subject, queue.value(), sid);
-
-    } else
+    }
+    else
     {
         payload = fmt::format(sub_payload, subject, "", sid);
     }
 
     boost::asio::async_write(m_socket, boost::asio::buffer(payload), boost::asio::transfer_exactly(payload.size()),  c[ec]);
+
     if (auto s = handle_error(c); s.failed())
     {
         return {isubscription_sptr(), s};
     }
-    m_log->trace("subscribe sent: {}", payload);
 
+    m_log->trace("subscribe sent: {}", payload);
     auto sub = std::make_shared<subscription>(sid, cb);
     m_subs.emplace(sid, sub);
-
     return {sub, {}};
 }
 
@@ -304,17 +333,22 @@ void connection::on_info(std::string_view info, ctx)
     m_log->trace("info recived and parsed");
 }
 
-void connection::on_message(std::string_view subject, std::string_view sid_str, std::optional<std::string_view> reply_to, const char *raw, std::size_t n, ctx c)
+void connection::on_message(std::string_view subject, std::string_view sid_str, std::optional<std::string_view> reply_to, const char* raw, std::size_t n, ctx c)
 {
     std::size_t sid = 0;
-    try {
+
+    try
+    {
         sid = boost::lexical_cast<uint64_t>(sid_str);
-    } catch (const std::exception& e) {
+    }
+    catch (const std::exception& e)
+    {
         m_log->error("can't parse sid: {}", e.what());
         return;
     }
 
     auto it = m_subs.find(sid);
+
     if (it == m_subs.end())
     {
         m_log->trace("dropping message because subscription not found: topic: {}, sid: {}", subject, sid_str);
@@ -325,6 +359,7 @@ void connection::on_message(std::string_view subject, std::string_view sid_str, 
     {
         m_log->trace("subscribtion canceled {}", sid);
         auto s = unsubscribe(it->second, c);
+
         if (s.failed())
         {
             m_log->error("unsubscribe failed: {}", s.error());
@@ -339,6 +374,16 @@ void connection::on_message(std::string_view subject, std::string_view sid_str, 
     {
         it->second->m_cb(subject, nullptr, raw, n, c);
     }
+}
+
+void subscription::cancel()
+{
+    m_cancel = true;
+}
+
+uint64_t subscription::sid()
+{
+    return m_sid;
 }
 
 }

@@ -30,3 +30,13 @@
 *.exe
 *.out
 *.app
+
+build/*
+.vscode/tasks.json
+.vscode/settings.json
+.vscode/launch.json
+.vscode/c_cpp_properties.json
+CMakeLists.txt.user
+Testing/*
+build/CMakeCache.txt
+build_debug/*
