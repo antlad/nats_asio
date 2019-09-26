@@ -88,14 +88,9 @@ void connection::start(std::string_view address, uint16_t port)
     boost::asio::spawn(m_io, std::bind(&connection::run, this, address, port, std::placeholders::_1));
 }
 
-
 void connection::run(std::string_view address, uint16_t port, ctx c)
 {
-    std::size_t prev_consumed = 0;
-    //    std::string data;
-    std::string data;
-    //    m_max_payload = 1024 * 1024;//TODO: move it to constructor
-    data.reserve(m_max_payload);
+    std::string header;
 
     for (;;)
     {
@@ -114,17 +109,19 @@ void connection::run(std::string_view address, uint16_t port, ctx c)
                 continue;
             }
 
-            boost::asio::async_read_until(m_socket, boost::asio::dynamic_buffer(data, m_max_payload), "\r\n", c[ec]);
+            //boost::asio::dynamic_buffer(data, m_max_payload)
+            boost::asio::async_read_until(m_socket, m_buf, "\r\n", c[ec]);
 
             if (auto s = handle_error(c); s.failed())
             {
                 m_log->error("read server info failed {}", s.error());
-                data.resize(0);
+                //                b.consume(rsize);
                 continue;
             }
 
-            auto [consumed, s] = parse_message(data, this, c);
-            data.resize(data.size() - consumed);
+            //b.data()
+            std::istream is(&m_buf);
+            auto s = parse_header(header, is, this, c);
 
             if (s.failed())
             {
@@ -132,7 +129,8 @@ void connection::run(std::string_view address, uint16_t port, ctx c)
                 continue;
             }
 
-            data.reserve(m_max_payload);
+            //m_buf.consume(header.size());
+            //data.reserve(m_max_payload);
             options o;
             auto info = prepare_info(o);
             boost::asio::async_write(m_socket, boost::asio::buffer(info), boost::asio::transfer_exactly(info.size()),  c[ec]);
@@ -151,38 +149,30 @@ void connection::run(std::string_view address, uint16_t port, ctx c)
             }
         }
 
-        if (data.size() != 0 && prev_consumed == 0)
-        {
-            //            auto pre_size = data.size();
-            //            std::size_t step = 1024;
-            //            data.resize(pre_size + step);
-            //m_socket.async_read_some(boost::asio::buffer(&data[pre_size - 1], step), c[ec]);
-            m_socket.async_read_some(boost::asio::dynamic_buffer(data, m_max_payload), c[ec]);
-        }
-        else
-        {
-            boost::asio::async_read_until(m_socket, boost::asio::dynamic_buffer(data, m_max_payload), "\r\n", c[ec]);
-        }
+        boost::asio::async_read_until(m_socket, m_buf, "\r\n", c[ec]);
 
         if (auto s = handle_error(c); s.failed())
         {
             m_log->error("failed to read {}", s.error());
-            data.resize(0);
+            //            data.resize(0);
             //b.consume(data.size());
             continue;
         }
 
         m_log->trace("read done");
-        auto [consumed, s] = parse_message(data, this, c);
-        data.resize(data.size() - consumed);
+        std::istream is(&m_buf);
+        //auto p = m_buf.data();
+        auto s = parse_header(header, is, this, c);
+        //        data.resize(data.size() - consumed);
 
         if (s.failed())
         {
             m_log->error("process message failed with error: {}", s.error());
+            continue;
         }
 
         // b.consume(consumed);
-        prev_consumed = consumed;
+        //        prev_consumed = consumed;
     }
 }
 
@@ -330,11 +320,24 @@ void connection::on_info(std::string_view info, ctx)
     auto j = json::parse(info);
     m_log->debug("got info {}", j.dump());
     m_max_payload = j["max_payload"].get<std::size_t>();
+    //    m_payload_buf.resize(m_max_payload);
     m_log->trace("info recived and parsed");
 }
 
-void connection::on_message(std::string_view subject, std::string_view sid_str, std::optional<std::string_view> reply_to, const char* raw, std::size_t n, ctx c)
+void connection::on_message(std::string_view subject, std::string_view sid_str, std::optional<std::string_view> reply_to, std::size_t n, ctx c)
 {
+    auto bytes_to_transsfer = n + 2 - m_buf.size();
+    boost::asio::async_read(m_socket, m_buf, boost::asio::transfer_exactly(bytes_to_transsfer), c[ec]);
+
+    if (auto s = handle_error(c); s.failed())
+    {
+        m_log->error("failed to read {}", s.error());
+        //            data.resize(0);
+        //b.consume(data.size());
+        return;
+    }
+
+    //m_buf.data()
     std::size_t sid = 0;
 
     try
@@ -366,14 +369,26 @@ void connection::on_message(std::string_view subject, std::string_view sid_str, 
         }
     }
 
+    auto b = m_buf.data();
+
     if (reply_to.has_value())
     {
-        it->second->m_cb(subject, reply_to, raw, n, c);
+        it->second->m_cb(subject, reply_to, static_cast<const char*>(b.data()), n, c);
     }
     else
     {
-        it->second->m_cb(subject, nullptr, raw, n, c);
+        it->second->m_cb(subject, nullptr, static_cast<const char*>(b.data()), n, c);
     }
+}
+
+void connection::consumed(std::size_t n)
+{
+    //    if (n == 0)
+    //    {
+    //        auto p = m_buf.data();
+    //        auto n = p.size();
+    //    }
+    m_buf.consume(n);
 }
 
 void subscription::cancel()

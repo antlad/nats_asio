@@ -21,11 +21,13 @@ struct parser_observer
 
     virtual void on_info(std::string_view info, ctx c) = 0;
 
-    virtual void on_message(std::string_view subject, std::string_view sid, std::optional<std::string_view> reply_to, const char* raw, std::size_t n, ctx c) = 0;
+    virtual void on_message(std::string_view subject, std::string_view sid, std::optional<std::string_view> reply_to, std::size_t n, ctx c) = 0;
+
+    virtual void consumed(std::size_t n) = 0;
 
 };
 
-std::tuple<std::size_t, status> parse_message(std::string_view buffer, parser_observer* observer, ctx c);
+status parse_header(std::string& header, std::istream& is, parser_observer* observer, ctx c);
 
 }
 
