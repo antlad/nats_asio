@@ -86,6 +86,23 @@ bool connection::is_connected()
 void connection::start(std::string_view address, uint16_t port)
 {
     boost::asio::spawn(m_io, std::bind(&connection::run, this, address, port, std::placeholders::_1));
+    boost::asio::spawn(m_io,
+                       [&](boost::asio::yield_context ctx)
+    {
+        boost::asio::deadline_timer timer(m_io);
+        boost::system::error_code error;
+
+        for (;;)
+        {
+            m_log->info("on timer {}", m_buf.size());
+            timer.expires_from_now(boost::posix_time::seconds(1));
+            timer.async_wait(ctx[error]);
+        }
+
+        // As only one thread is processing the io_service, the posted
+        // timer cancel will only be invoked once the coroutine yields.
+        //            assert(error == boost::asio::error::operation_aborted);
+    });
 }
 
 void connection::run(std::string_view address, uint16_t port, ctx c)
@@ -163,6 +180,7 @@ void connection::run(std::string_view address, uint16_t port, ctx c)
         std::istream is(&m_buf);
         //auto p = m_buf.data();
         auto s = parse_header(header, is, this, c);
+
         //        data.resize(data.size() - consumed);
 
         if (s.failed())
@@ -320,24 +338,26 @@ void connection::on_info(std::string_view info, ctx)
     auto j = json::parse(info);
     m_log->debug("got info {}", j.dump());
     m_max_payload = j["max_payload"].get<std::size_t>();
-    //    m_payload_buf.resize(m_max_payload);
     m_log->trace("info recived and parsed");
 }
 
 void connection::on_message(std::string_view subject, std::string_view sid_str, std::optional<std::string_view> reply_to, std::size_t n, ctx c)
 {
-    auto bytes_to_transsfer = n + 2 - m_buf.size();
-    boost::asio::async_read(m_socket, m_buf, boost::asio::transfer_exactly(bytes_to_transsfer), c[ec]);
+    int bytes_to_transsfer = int(n) + 2 - int(m_buf.size());
+
+    if (bytes_to_transsfer > 0)
+    {
+        m_log->info("payload read start");
+        boost::asio::async_read(m_socket, m_buf, boost::asio::transfer_at_least(std::size_t(bytes_to_transsfer)), c[ec]);
+        m_log->info("payload read done");
+    }
 
     if (auto s = handle_error(c); s.failed())
     {
         m_log->error("failed to read {}", s.error());
-        //            data.resize(0);
-        //b.consume(data.size());
         return;
     }
 
-    //m_buf.data()
     std::size_t sid = 0;
 
     try
@@ -383,11 +403,6 @@ void connection::on_message(std::string_view subject, std::string_view sid_str, 
 
 void connection::consumed(std::size_t n)
 {
-    //    if (n == 0)
-    //    {
-    //        auto p = m_buf.data();
-    //        auto n = p.size();
-    //    }
     m_buf.consume(n);
 }
 
