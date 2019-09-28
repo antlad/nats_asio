@@ -26,17 +26,17 @@ typedef std::function<void(iconnection* conn, ctx c)> on_disconnected;
 struct iconnection {
     virtual ~iconnection() = default;
 
-    virtual void start(std::string_view address, uint16_t port) = 0;
+    virtual void start(string_view address, uint16_t port) = 0;
 
     virtual void stop() = 0;
 
     virtual bool is_connected() = 0;
 
-    virtual status publish(std::string_view subject, const char* raw, std::size_t n, std::optional<std::string_view> reply_to, ctx c) = 0;
+    virtual status publish(string_view subject, const char* raw, std::size_t n, optional<string_view> reply_to, ctx c) = 0;
 
     virtual status unsubscribe(const isubscription_sptr& p, ctx c) = 0;
 
-    virtual std::tuple<isubscription_sptr,status> subscribe(std::string_view subject, std::optional<std::string_view> queue, on_message_cb cb, ctx c) = 0;
+    virtual std::tuple<isubscription_sptr,status> subscribe(string_view subject, optional<string_view> queue, on_message_cb cb, ctx c) = 0;
 
 };
 typedef std::shared_ptr<iconnection> iconnection_sptr;

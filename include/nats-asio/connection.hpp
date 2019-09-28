@@ -9,7 +9,6 @@
 #include <boost/asio/streambuf.hpp>
 
 #include <string>
-#include <optional>
 #include <functional>
 
 namespace nats_asio {
@@ -20,17 +19,17 @@ class connection
 public:
     connection(const logger& log, aio& io, const on_connected_cb& connected_cb, const on_disconnected_cb& disconnected_cb);
 
-    virtual void start(std::string_view address, uint16_t port) override;
+    virtual void start(string_view address, uint16_t port) override;
 
     virtual void stop() override;
 
     virtual bool is_connected() override;
 
-    virtual status publish(std::string_view subject, const char* raw, std::size_t n, std::optional<std::string_view> reply_to, ctx c) override;
+    virtual status publish(string_view subject, const char* raw, std::size_t n, optional<string_view> reply_to, ctx c) override;
 
     virtual status unsubscribe(const isubscription_sptr& p, ctx c) override;
 
-    virtual std::tuple<isubscription_sptr, status> subscribe(std::string_view subject,  std::optional<std::string_view> queue, on_message_cb cb, ctx c) override;
+    virtual std::tuple<isubscription_sptr, status> subscribe(string_view subject,  optional<string_view> queue, on_message_cb cb, ctx c) override;
 
 private:
     virtual void on_ping(ctx c) override;
@@ -39,15 +38,15 @@ private:
 
     virtual void on_ok(ctx c) override;
 
-    virtual void on_error(std::string_view err, ctx c) override;
+    virtual void on_error(string_view err, ctx c) override;
 
-    virtual void on_info(std::string_view info, ctx c) override;
+    virtual void on_info(string_view info, ctx c) override;
 
-    virtual void on_message(std::string_view subject, std::string_view sid, std::optional<std::string_view> reply_to, std::size_t n, ctx c) override;
+    virtual void on_message(string_view subject, string_view sid, optional<string_view> reply_to, std::size_t n, ctx c) override;
 
     virtual void consumed(std::size_t n) override;
 
-    void run(std::string_view address, uint16_t port, ctx c);
+    void run(string_view address, uint16_t port, ctx c);
 
     status handle_error(ctx c);
 

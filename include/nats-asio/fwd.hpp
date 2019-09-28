@@ -1,6 +1,8 @@
 #pragma once
 
 #include <memory>
+#include <boost/optional.hpp>
+#include <boost/utility/string_view.hpp>
 
 namespace nats_asio {
 struct options;
@@ -11,6 +13,9 @@ typedef std::shared_ptr<subscription> subscription_sptr;
 
 class connection;
 typedef std::shared_ptr<connection> connection_sptr;
+
+using boost::optional;
+using boost::string_view;
 
 }
 

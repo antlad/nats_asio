@@ -36,9 +36,9 @@ const std::map<std::string, mt, std::less<>> message_types_map
     {"-ERR", mt::ERR},
 };
 
-std::vector<std::string_view> split_sv(std::string_view str, std::string_view delims = " ")
+std::vector<string_view> split_sv(string_view str, string_view delims = " ")
 {
-    std::vector<std::string_view> output;
+    std::vector<string_view> output;
     output.reserve(str.size() / 2);
 
     for (auto first = str.data(), second = str.data(), last = first + str.size(); second != last && first != last; first = second + 1)
@@ -69,15 +69,15 @@ status parse_header(std::string& header, std::istream& is, parser_observer* obse
         return {"too small header"};
     }
 
-    auto v = std::string_view(&header[0], header.size());
+    auto v = string_view(&header[0], header.size());
     auto p = v.find_first_of(" \r");
 
-    if (p == std::string_view::npos)
+    if (p == string_view::npos)
     {
         return {"protocol violation from server"};
     }
 
-    v = std::string_view(&header[0], header.size() - 1);
+    v = string_view(&header[0], header.size() - 1);
     auto it = message_types_map.find(v.substr(0, p));
 
     if (it == message_types_map.end())
@@ -127,7 +127,7 @@ status parse_header(std::string& header, std::istream& is, parser_observer* obse
         }
         else
         {
-            observer->on_message(results[0], results[1], std::optional<std::string_view>(), bytes_n, c);
+            observer->on_message(results[0], results[1], optional<string_view>(), bytes_n, c);
         }
 
         observer->consumed(bytes_n + 2);

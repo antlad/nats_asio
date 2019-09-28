@@ -17,11 +17,11 @@ struct parser_observer
 
     virtual void on_ok(ctx c) = 0;
 
-    virtual void on_error(std::string_view err, ctx c) = 0;
+    virtual void on_error(string_view err, ctx c) = 0;
 
-    virtual void on_info(std::string_view info, ctx c) = 0;
+    virtual void on_info(string_view info, ctx c) = 0;
 
-    virtual void on_message(std::string_view subject, std::string_view sid, std::optional<std::string_view> reply_to, std::size_t n, ctx c) = 0;
+    virtual void on_message(string_view subject, string_view sid, optional<string_view> reply_to, std::size_t n, ctx c) = 0;
 
     virtual void consumed(std::size_t n) = 0;
 

@@ -1,4 +1,5 @@
 #include <nats-asio/interface.hpp>
+#include <nats-asio/fwd.hpp>
 
 #include <spdlog/spdlog.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
@@ -19,18 +20,18 @@ int main()
     try
     {
         auto console = spdlog::stdout_color_mt("console");
-        console->set_level(spdlog::level::info);
+        console->set_level(spdlog::level::debug);
         boost::asio::io_context ioc;
         boost::asio::io_context::work w(ioc);
         std::size_t counter = 0;
         auto conn = nats_asio::create_connection(console, ioc, [&console, &counter](nats_asio::iconnection & c, nats_asio::ctx ctx)
         {
             console->info("on connected");
-            auto [sub, s] = c.subscribe("output", nullptr, [&counter](std::string_view, std::optional<std::string_view>, const char* raw, std::size_t n, nats_asio::ctx)
+            auto [sub, s] = c.subscribe("output", {}, [&console, &counter](nats_asio::string_view, nats_asio::optional<nats_asio::string_view>, const char* raw, std::size_t n, nats_asio::ctx)
             {
                 counter++;
-                //std::string_view view(raw, n);
-                //console->info("on new message:  {}", view);
+                //                string_view view(raw, n);
+                //                console->info("on new message:  {}", view);
             }, ctx);
 
             if (s.failed())
