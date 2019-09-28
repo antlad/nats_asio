@@ -38,7 +38,6 @@ TEST(small_messages, ping)
     {
         std::stringstream ss(payload);
         auto s = parse_header(header, ss, &m, c);
-        //        EXPECT_EQ(payload.size(), n);
         EXPECT_EQ(false, s.failed());
     });
 }
@@ -53,7 +52,6 @@ TEST(small_messages, pong)
     {
         std::stringstream ss(payload);
         auto s = parse_header(header, ss, &m, c);
-        //        EXPECT_EQ(payload.size(), n);
         EXPECT_EQ(false, s.failed());
     });
 }
@@ -68,7 +66,6 @@ TEST(small_messages, ok)
     {
         std::stringstream ss(payload);
         auto s = parse_header(header, ss, &m, c);
-        //        EXPECT_EQ(payload.size(), n);
         EXPECT_EQ(false, s.failed());
     });
 }
@@ -84,7 +81,6 @@ TEST(payload_messages, err)
     {
         std::stringstream ss(payload);
         auto s = parse_header(header, ss, &m, c);
-        //        EXPECT_EQ(payload.size(), n);
         EXPECT_EQ(false, s.failed());
     });
 }
@@ -101,7 +97,6 @@ TEST(payload_messages, info)
         std::stringstream ss(payload);
         auto s = parse_header(header, ss, &m, c);
         EXPECT_EQ(false, s.failed());
-        //        EXPECT_EQ(n, payload.size());
     });
 }
 
@@ -118,7 +113,6 @@ TEST(payload_messages, info_with_overflow)
         std::stringstream ss(payload);
         auto s = parse_header(header, ss, &m, c);
         EXPECT_EQ(false, s.failed());
-        //        EXPECT_EQ(n, payload.size());
     });
 }
 
@@ -140,11 +134,9 @@ TEST(payload_messages, on_message)
         std::stringstream ss(payload);
         auto s1 = parse_header(header, ss, &m, c);
         EXPECT_EQ(false, s1.failed());
-        //        EXPECT_EQ(n1, payload.size());
         std::stringstream ss2(payload2);
         auto  s2 = parse_header(header, ss2, &m, c);
         EXPECT_EQ(false, s2.failed());
-        //        EXPECT_EQ(n2, payload2.size());
     });
 }
 
@@ -189,7 +181,6 @@ TEST(payload_messages, on_message_not_full_no_sep)
         std::stringstream ss(payload);
         auto s1 = parse_header(header, ss, &m, c);
         EXPECT_EQ(true, s1.failed());
-        //        EXPECT_EQ(n1, 0);
     });
 }
 
@@ -208,6 +199,5 @@ TEST(payload_messages, on_message_not_full)
         std::stringstream ss(payload);
         auto s1 = parse_header(header, ss, &m, c);
         EXPECT_EQ(false, s1.failed());
-        //        EXPECT_EQ(n1, 0);
     });
 }

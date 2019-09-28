@@ -3,7 +3,6 @@
 #include <nats-asio/fwd.hpp>
 
 #include <fmt/format.h>
-//#include <fmt/
 
 #include <stdexcept>
 
@@ -47,19 +46,6 @@ private:
     optional<std::string> m_error;
 };
 
-class detailed_exception
-    : public std::exception {
-public:
-
-    detailed_exception(const std::string& msg, const std::string& file, int line);
-
-    virtual const char* what() const noexcept override;
-private:
-    std::string m_msg;
-};
-
 
 }
 
-#define THROW_EXP(MSG) \
-    throw nats_asio::detailed_exception(MSG, __FILE__, __LINE__);

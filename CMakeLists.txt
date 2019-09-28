@@ -10,7 +10,7 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 option(ENABLE_TESTS "enable tests" ON)
 
-#add_definitions(-DSPDLOG_FMT_EXTERNAL)
+add_definitions(-DSPDLOG_FMT_EXTERNAL)
 
 set(Boost_USE_STATIC_LIBS OFF)
 set(Boost_USE_MULTITHREADED ON)
@@ -27,9 +27,9 @@ find_package(OpenSSL REQUIRED)
 
 include_directories(
 	"${CMAKE_CURRENT_LIST_DIR}/include"
-		"${CMAKE_INSTALL_PREFIX}/include"
-		"${CMAKE_PREFIX_PATH}/include"
-		"${Boost_INCLUDE_DIRS}"
+	"${CMAKE_INSTALL_PREFIX}/include"
+	"${CMAKE_PREFIX_PATH}/include"
+	"${Boost_INCLUDE_DIRS}"
 		"${OPENSSL_INCLUDE_DIR}"
 		)
 
@@ -50,7 +50,6 @@ set(nats_asio_SRCS
 	"${LINCLUDE}/parser.hpp"
 	"common.cpp"
 	"connection.cpp"
-	"structs.cpp"
 	"parser.cpp"
 )
 
