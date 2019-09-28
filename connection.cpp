@@ -6,7 +6,6 @@
 #include <boost/asio/read_until.hpp>
 #include <boost/asio/read.hpp>
 #include <boost/algorithm/string.hpp>
-#include <boost/lexical_cast.hpp>
 
 #include <nlohmann/json.hpp>
 
@@ -335,9 +334,7 @@ void connection::on_message(string_view subject, string_view sid_str, optional<s
 
     try
     {
-        //        sid = std::stoull(sid_str)
-        //auto s = std::to_integer();
-        sid = boost::lexical_cast<uint64_t>(sid_str);
+        std::stoll(sid_str.data(), &sid);
     }
     catch (const std::exception& e)
     {

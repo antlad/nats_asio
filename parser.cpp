@@ -1,7 +1,6 @@
 #include <nats-asio/parser.hpp>
 
 #include <boost/algorithm/string.hpp>
-#include <boost/lexical_cast.hpp>
 
 #include <map>
 #include <vector>
@@ -112,7 +111,7 @@ status parse_header(std::string& header, std::istream& is, parser_observer* obse
 
         try
         {
-            bytes_n = boost::lexical_cast<uint64_t>(results[bytes_id]);
+            std::stoll(results[bytes_id].data(), &bytes_n);
         }
         catch (const std::exception& e)
         {
