@@ -1,10 +1,11 @@
 #pragma once
 
+#include "parser.hpp"
+
 #include <nats-asio/fwd.hpp>
 #include <nats-asio/defs.hpp>
 #include <nats-asio/common.hpp>
 #include <nats-asio/interface.hpp>
-#include <nats-asio/parser.hpp>
 
 #include <boost/asio/streambuf.hpp>
 

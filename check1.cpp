@@ -1,7 +1,7 @@
 #include <gtest/gtest.h>
 #include <gmock/gmock.h>
 
-#include <nats-asio/parser.hpp>
+#include "parser.hpp"
 #include <nats-asio/defs.hpp>
 
 #include <sstream>

@@ -8,9 +8,6 @@
 #include <boost/asio/spawn.hpp>
 #include <boost/asio/ip/tcp.hpp>
 #include <boost/asio/ssl/context.hpp>
-//#include <boost/beast/core.hpp>
-//#include <boost/beast/websocket.hpp>
-//#include <boost/beast/websocket/ssl.hpp>
 #include <boost/asio/ssl/stream.hpp>
 #include <boost/asio/buffer.hpp>
 #include <boost/asio/ssl/context.hpp>

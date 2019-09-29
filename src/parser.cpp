@@ -1,4 +1,4 @@
-#include <nats-asio/parser.hpp>
+#include "parser.hpp"
 
 #include <boost/algorithm/string.hpp>
 
@@ -61,22 +61,31 @@ status parse_header(std::string& header, std::istream& is, parser_observer* obse
         return {"can't get line"};
     }
 
-    // observer->consumed(0);
-
-    if (header.size() < 4)
+    if (header.size() < 4) // TODO: maybe delte this check?
     {
         return {"too small header"};
     }
 
-    auto v = string_view(&header[0], header.size());
-    auto p = v.find_first_of(" \r");
+    if (header[header.size() - 1] != '\r')
+    {
+        return {"unexpected len of server message"};
+    }
+
+    header[header.size() - 1] = 0;
+    header.resize(header.size() - 1);
+    auto v = string_view(header);
+    auto p = v.find_first_of(" ");
 
     if (p == string_view::npos)
     {
-        return {"protocol violation from server"};
+        if (header.size() != 4 && header.size() != 3) //ok or ping/pong
+        {
+            return {"protocol violation from server"};
+        }
+
+        p = header.size();
     }
 
-    v = string_view(&header[0], header.size() - 1);
     auto it = message_types_map.find(v.substr(0, p));
 
     if (it == message_types_map.end())
@@ -111,14 +120,12 @@ status parse_header(std::string& header, std::istream& is, parser_observer* obse
 
         try
         {
-            std::stoll(results[bytes_id].data(), &bytes_n);
+            bytes_n = static_cast<std::size_t>(std::stoll(results[bytes_id].data(), nullptr, 10));
         }
         catch (const std::exception& e)
         {
             return {"can't parse int in headers: {}", e.what()};
         }
-
-        // observer->consumed(header.size() + 1);
 
         if (replty_to)
         {
@@ -165,7 +172,6 @@ status parse_header(std::string& header, std::istream& is, parser_observer* obse
     }
     }
 
-    // observer->consumed(header.size() + 1);
     return {};
 }
 

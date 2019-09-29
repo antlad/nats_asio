@@ -27,30 +27,26 @@ find_package(OpenSSL REQUIRED)
 
 include_directories(
 	"${CMAKE_CURRENT_LIST_DIR}/include"
+	"${CMAKE_CURRENT_LIST_DIR}/src"
 	"${CMAKE_INSTALL_PREFIX}/include"
 	"${CMAKE_PREFIX_PATH}/include"
 	"${Boost_INCLUDE_DIRS}"
-		"${OPENSSL_INCLUDE_DIR}"
-		)
+	"${OPENSSL_INCLUDE_DIR}"
+	)
 
 set(LINCLUDE "${CMAKE_CURRENT_LIST_DIR}/include/nats-asio" )
-
-include_directories(
-	"${CMAKE_INSTALL_PREFIX}/include"
-	"${CMAKE_PREFIX_PATH}/include"
-	)
 
 set(nats_asio_SRCS
 	"${LINCLUDE}/defs.hpp"
 	"${LINCLUDE}/common.hpp"
-	"${LINCLUDE}/connection.hpp"
 	"${LINCLUDE}/fwd.hpp"
-	"${LINCLUDE}/structs.hpp"
 	"${LINCLUDE}/interface.hpp"
-	"${LINCLUDE}/parser.hpp"
-	"common.cpp"
-	"connection.cpp"
-	"parser.cpp"
+	"src/connection.hpp"
+	"src/structs.hpp"
+	"src/parser.hpp"
+	"src/common.cpp"
+	"src/connection.cpp"
+	"src/parser.cpp"
 )
 
 

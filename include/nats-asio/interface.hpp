@@ -7,7 +7,8 @@
 namespace nats_asio {
 
 
-struct isubscription{
+struct isubscription
+{
     virtual ~isubscription() = default;
 
     virtual uint64_t sid() = 0;
@@ -23,7 +24,9 @@ typedef std::shared_ptr<isubscription> isubscription_sptr;
 typedef std::function<void(iconnection* conn, ctx c)> on_connected;
 typedef std::function<void(iconnection* conn, ctx c)> on_disconnected;
 
-struct iconnection {
+
+struct iconnection
+{
     virtual ~iconnection() = default;
 
     virtual void start(string_view address, uint16_t port) = 0;
@@ -36,7 +39,7 @@ struct iconnection {
 
     virtual status unsubscribe(const isubscription_sptr& p, ctx c) = 0;
 
-    virtual std::tuple<isubscription_sptr,status> subscribe(string_view subject, optional<string_view> queue, on_message_cb cb, ctx c) = 0;
+    virtual std::tuple<isubscription_sptr, status> subscribe(string_view subject, optional<string_view> queue, on_message_cb cb, ctx c) = 0;
 
 };
 typedef std::shared_ptr<iconnection> iconnection_sptr;

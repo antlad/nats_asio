@@ -1,5 +1,5 @@
-#include <nats-asio/connection.hpp>
-#include <nats-asio/structs.hpp>
+#include "connection.hpp"
+#include "structs.hpp"
 
 #include <boost/asio/ip/tcp.hpp>
 #include <boost/asio/buffer.hpp>
@@ -108,18 +108,15 @@ void connection::run(string_view address, uint16_t port, ctx c)
                 continue;
             }
 
-            //boost::asio::dynamic_buffer(data, m_max_payload)
             boost::asio::async_read_until(m_socket, m_buf, "\r\n", c[ec]);
             auto s = handle_error(c);
 
             if (s.failed())
             {
                 m_log->error("read server info failed {}", s.error());
-                //                b.consume(rsize);
                 continue;
             }
 
-            //b.data()
             std::istream is(&m_buf);
             s = parse_header(header, is, this, c);
 
@@ -129,8 +126,6 @@ void connection::run(string_view address, uint16_t port, ctx c)
                 continue;
             }
 
-            //m_buf.consume(header.size());
-            //data.reserve(m_max_payload);
             options o;
             auto info = prepare_info(o);
             boost::asio::async_write(m_socket, boost::asio::buffer(info), boost::asio::transfer_exactly(info.size()),  c[ec]);
@@ -156,25 +151,17 @@ void connection::run(string_view address, uint16_t port, ctx c)
         if (s.failed())
         {
             m_log->error("failed to read {}", s.error());
-            //            data.resize(0);
-            //b.consume(data.size());
             continue;
         }
 
         std::istream is(&m_buf);
-        //auto p = m_buf.data();
         s = parse_header(header, is, this, c);
-
-        //        data.resize(data.size() - consumed);
 
         if (s.failed())
         {
             m_log->error("process message failed with error: {}", s.error());
             continue;
         }
-
-        // b.consume(consumed);
-        //        prev_consumed = consumed;
     }
 }
 
@@ -334,7 +321,7 @@ void connection::on_message(string_view subject, string_view sid_str, optional<s
 
     try
     {
-        std::stoll(sid_str.data(), &sid);
+        sid = static_cast<std::size_t>(std::stoll(sid_str.data(), nullptr, 10));
     }
     catch (const std::exception& e)
     {
