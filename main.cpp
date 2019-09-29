@@ -21,7 +21,7 @@ int main()
         auto conn = nats_asio::create_connection(console, ioc, [&console, &counter](nats_asio::iconnection & c, nats_asio::ctx ctx)
         {
             console->info("on connected");
-            auto r = c.subscribe("output", {}, [&counter](nats_asio::string_view, nats_asio::optional<nats_asio::string_view>, const char* raw, std::size_t n, nats_asio::ctx)
+            auto r = c.subscribe("output", {}, [&counter](nats_asio::string_view, nats_asio::optional<nats_asio::string_view>, const char* /*raw*/, std::size_t /*n*/, nats_asio::ctx)
             {
                 counter++;
             }, ctx);
