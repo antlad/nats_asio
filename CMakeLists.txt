@@ -9,6 +9,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 option(ENABLE_TESTS "enable tests" OFF)
+option(ENABLE_EXAMPLES "enable build examples" OFF)
 
 add_definitions(-DSPDLOG_FMT_EXTERNAL)
 
@@ -29,17 +30,22 @@ include_directories(
 	"${CMAKE_CURRENT_LIST_DIR}/include"
 	"${CMAKE_CURRENT_LIST_DIR}/src"
 	"${CMAKE_PREFIX_PATH}/include"
+	"${CMAKE_INSTALL_PREFIX}/include"
 	"${Boost_INCLUDE_DIRS}"
 	"${OPENSSL_INCLUDE_DIR}"
 	)
 
 set(LINCLUDE "${CMAKE_CURRENT_LIST_DIR}/include/nats_asio" )
 
-set(nats_asio_SRCS
+set(nats_asio_PUB_INCLUDES
 	"${LINCLUDE}/defs.hpp"
 	"${LINCLUDE}/common.hpp"
 	"${LINCLUDE}/fwd.hpp"
 	"${LINCLUDE}/interface.hpp"
+	)
+
+set(nats_asio_SRCS
+
 	"src/connection.hpp"
 	"src/structs.hpp"
 	"src/parser.hpp"
@@ -49,13 +55,16 @@ set(nats_asio_SRCS
 )
 
 
-add_library(nats_asio ${nats_asio_SRCS})
-add_executable(example1 main.cpp)
+add_library(nats_asio ${nats_asio_SRCS} ${nats_asio_PUB_INCLUDES})
+target_link_libraries(nats_asio  pthread "${Boost_COROUTINE_LIBRARIES}" OpenSSL::Crypto OpenSSL::SSL fmt::fmt)
 
-target_link_libraries(example1  pthread nats_asio "${Boost_COROUTINE_LIBRARIES}" OpenSSL::Crypto OpenSSL::SSL fmt::fmt)
+if (ENABLE_EXAMPLES)
+	add_executable(example1 main.cpp)
+	target_link_libraries(example1 nats_asio)
+endif()
 
 install(TARGETS nats_asio DESTINATION "${CMAKE_INSTALL_PREFIX}/lib/")
-install(FILES "${LINCLUDE}/*.hpp" DESTINATION "${CMAKE_INSTALL_PREFIX}/include/nats_asio/")
+install(FILES ${nats_asio_PUB_INCLUDES} DESTINATION "${CMAKE_INSTALL_PREFIX}/include/nats_asio/")
 
 if (ENABLE_TESTS)
 	enable_testing()
