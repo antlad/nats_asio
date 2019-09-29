@@ -1,5 +1,5 @@
-#include <nats-asio/interface.hpp>
-#include <nats-asio/fwd.hpp>
+#include <nats_asio/interface.hpp>
+#include <nats_asio/fwd.hpp>
 
 #include <spdlog/spdlog.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
@@ -7,13 +7,7 @@
 #include <fmt/format.h>
 
 #include <iostream>
-
-
-void publish(nats_asio::iconnection* c, nats_asio::ctx ctx)
-{
-    // c->publish()
-}
-
+#include <tuple>
 
 int main()
 {
@@ -27,16 +21,14 @@ int main()
         auto conn = nats_asio::create_connection(console, ioc, [&console, &counter](nats_asio::iconnection & c, nats_asio::ctx ctx)
         {
             console->info("on connected");
-            auto [sub, s] = c.subscribe("output", {}, [&console, &counter](nats_asio::string_view, nats_asio::optional<nats_asio::string_view>, const char* raw, std::size_t n, nats_asio::ctx)
+            auto r = c.subscribe("output", {}, [&counter](nats_asio::string_view, nats_asio::optional<nats_asio::string_view>, const char* raw, std::size_t n, nats_asio::ctx)
             {
                 counter++;
-                //                string_view view(raw, n);
-                //                console->info("on new message:  {}", view);
             }, ctx);
 
-            if (s.failed())
+            if (r.second.failed())
             {
-                console->error("failed to subscribe with error: {}", s.error());
+                console->error("failed to subscribe with error: {}", r.second.error());
             }
         }, [&console](nats_asio::iconnection&, nats_asio::ctx)
         {
@@ -54,10 +46,6 @@ int main()
                 timer.expires_from_now(boost::posix_time::seconds(1));
                 timer.async_wait(ctx[error]);
             }
-
-            // As only one thread is processing the io_service, the posted
-            // timer cancel will only be invoked once the coroutine yields.
-            //            assert(error == boost::asio::error::operation_aborted);
         });
         nats_asio::connect_config conf;
         conf.address = "127.0.0.1";

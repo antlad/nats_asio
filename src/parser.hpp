@@ -1,7 +1,7 @@
 #pragma once
 
-#include <nats-asio/common.hpp>
-#include <nats-asio/defs.hpp>
+#include <nats_asio/common.hpp>
+#include <nats_asio/defs.hpp>
 
 #include <string_view>
 

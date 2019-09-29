@@ -1,6 +1,6 @@
 #pragma once
 
-#include <nats-asio/fwd.hpp>
+#include <nats_asio/fwd.hpp>
 
 #include <spdlog/spdlog.h>
 

@@ -1,4 +1,4 @@
-#include <nats-asio/common.hpp>
+#include <nats_asio/common.hpp>
 
 namespace nats_asio {
 

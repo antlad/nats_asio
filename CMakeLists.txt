@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.12)
 
-project(nats-asio)
+project(nats_asio)
 
 set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -8,7 +8,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
-option(ENABLE_TESTS "enable tests" ON)
+option(ENABLE_TESTS "enable tests" OFF)
 
 add_definitions(-DSPDLOG_FMT_EXTERNAL)
 
@@ -28,13 +28,12 @@ find_package(OpenSSL REQUIRED)
 include_directories(
 	"${CMAKE_CURRENT_LIST_DIR}/include"
 	"${CMAKE_CURRENT_LIST_DIR}/src"
-	"${CMAKE_INSTALL_PREFIX}/include"
 	"${CMAKE_PREFIX_PATH}/include"
 	"${Boost_INCLUDE_DIRS}"
 	"${OPENSSL_INCLUDE_DIR}"
 	)
 
-set(LINCLUDE "${CMAKE_CURRENT_LIST_DIR}/include/nats-asio" )
+set(LINCLUDE "${CMAKE_CURRENT_LIST_DIR}/include/nats_asio" )
 
 set(nats_asio_SRCS
 	"${LINCLUDE}/defs.hpp"
@@ -51,9 +50,12 @@ set(nats_asio_SRCS
 
 
 add_library(nats_asio ${nats_asio_SRCS})
-add_executable(nats_asio_check main.cpp)
+add_executable(example1 main.cpp)
 
-target_link_libraries(nats_asio_check  pthread nats_asio "${Boost_COROUTINE_LIBRARIES}" OpenSSL::Crypto OpenSSL::SSL fmt::fmt)
+target_link_libraries(example1  pthread nats_asio "${Boost_COROUTINE_LIBRARIES}" OpenSSL::Crypto OpenSSL::SSL fmt::fmt)
+
+install(TARGETS nats_asio DESTINATION "${CMAKE_INSTALL_PREFIX}/lib/")
+install(FILES "${LINCLUDE}/*.hpp" DESTINATION "${CMAKE_INSTALL_PREFIX}/include/nats_asio/")
 
 if (ENABLE_TESTS)
 	enable_testing()

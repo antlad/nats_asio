@@ -2,10 +2,10 @@
 
 #include "parser.hpp"
 
-#include <nats-asio/fwd.hpp>
-#include <nats-asio/defs.hpp>
-#include <nats-asio/common.hpp>
-#include <nats-asio/interface.hpp>
+#include <nats_asio/fwd.hpp>
+#include <nats_asio/defs.hpp>
+#include <nats_asio/common.hpp>
+#include <nats_asio/interface.hpp>
 
 #include <boost/asio/streambuf.hpp>
 
@@ -30,7 +30,7 @@ public:
 
     virtual status unsubscribe(const isubscription_sptr& p, ctx c) override;
 
-    virtual std::tuple<isubscription_sptr, status> subscribe(string_view subject,  optional<string_view> queue, on_message_cb cb, ctx c) override;
+    virtual std::pair<isubscription_sptr, status> subscribe(string_view subject,  optional<string_view> queue, on_message_cb cb, ctx c) override;
 
 private:
     virtual void on_ping(ctx c) override;

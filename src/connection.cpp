@@ -32,7 +32,7 @@ struct subscription: public isubscription
 std::string connection::prepare_info(const connect_config& o)
 {
     constexpr auto connect_payload = "CONNECT {}\r\n";
-    constexpr auto name = "nats-asio";
+    constexpr auto name = "nats_asio";
     constexpr auto lang = "cpp";
     constexpr auto version = "0.0.1";
     using nlohmann::json;
@@ -246,7 +246,7 @@ iconnection_sptr create_connection(const logger& log, aio& io, const on_connecte
     return std::make_shared<connection>(log, io, connected_cb, disconnected_cb);
 }
 
-std::tuple<isubscription_sptr, status> connection::subscribe(string_view subject,  optional<string_view> queue, on_message_cb cb, ctx c)
+std::pair<isubscription_sptr, status> connection::subscribe(string_view subject,  optional<string_view> queue, on_message_cb cb, ctx c)
 {
     if (!m_is_connected)
     {

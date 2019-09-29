@@ -2,7 +2,7 @@
 #include <gmock/gmock.h>
 
 #include "parser.hpp"
-#include <nats-asio/defs.hpp>
+#include <nats_asio/defs.hpp>
 
 #include <sstream>
 #include <iostream>
