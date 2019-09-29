@@ -20,7 +20,7 @@ add_definitions(-DSPDLOG_FMT_EXTERNAL)
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake")
 
-find_package(Boost 1.71 COMPONENTS coroutine REQUIRED)
+find_package(Boost COMPONENTS coroutine REQUIRED)
 find_package(FMT REQUIRED)
 find_package(spdlog REQUIRED)
 find_package(OpenSSL REQUIRED)

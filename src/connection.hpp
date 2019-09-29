@@ -20,7 +20,7 @@ class connection
 public:
     connection(const logger& log, aio& io, const on_connected_cb& connected_cb, const on_disconnected_cb& disconnected_cb);
 
-    virtual void start(string_view address, uint16_t port) override;
+    virtual void start(const connect_config& conf) override;
 
     virtual void stop() override;
 
@@ -47,11 +47,11 @@ private:
 
     virtual void consumed(std::size_t n) override;
 
-    void run(string_view address, uint16_t port, ctx c);
+    void run(const connect_config& conf, ctx c);
 
     status handle_error(ctx c);
 
-    std::string prepare_info(const options& o);
+    std::string prepare_info(const connect_config& o);
 
     uint64_t next_sid();
 

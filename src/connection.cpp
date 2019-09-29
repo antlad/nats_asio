@@ -29,7 +29,7 @@ struct subscription: public isubscription
     uint64_t m_sid;
 };
 
-std::string connection::prepare_info(const options& o)
+std::string connection::prepare_info(const connect_config& o)
 {
     constexpr auto connect_payload = "CONNECT {}\r\n";
     constexpr auto name = "nats-asio";
@@ -43,11 +43,24 @@ std::string connection::prepare_info(const options& o)
         {"ssl_required", o.ssl_required ? true : false},
         {"name", name },
         {"lang", lang },
-        {"user", o.user},
-        {"pass", o.pass },
         {"version", version},
-        {"auth_token", o.token}
     };
+
+    if (o.user.has_value())
+    {
+        j["user"] = o.user.value();
+    }
+
+    if (o.password.has_value())
+    {
+        j["pass"] = o.password.value();
+    }
+
+    if (o.token.has_value())
+    {
+        j["auth_token"] = o.token.value();
+    }
+
     auto info = j.dump();
     auto connect_data = fmt::format(connect_payload, info);
     m_log->debug("sending data on connect {}", info);
@@ -82,12 +95,12 @@ bool connection::is_connected()
     return m_is_connected;
 }
 
-void connection::start(string_view address, uint16_t port)
+void connection::start(const connect_config& conf)
 {
-    boost::asio::spawn(m_io, std::bind(&connection::run, this, address, port, std::placeholders::_1));
+    boost::asio::spawn(m_io, std::bind(&connection::run, this, conf, std::placeholders::_1));
 }
 
-void connection::run(string_view address, uint16_t port, ctx c)
+void connection::run(const connect_config& conf, ctx c)
 {
     std::string header;
 
@@ -101,7 +114,7 @@ void connection::run(string_view address, uint16_t port, ctx c)
 
         if (!m_is_connected)
         {
-            m_socket.async_connect(boost::asio::ip::tcp::endpoint(boost::asio::ip::make_address(address.data()), port), c[ec]);
+            m_socket.async_connect(boost::asio::ip::tcp::endpoint(boost::asio::ip::make_address(conf.address), conf.port), c[ec]);
 
             if (handle_error(c).failed())
             {
@@ -126,8 +139,7 @@ void connection::run(string_view address, uint16_t port, ctx c)
                 continue;
             }
 
-            options o;
-            auto info = prepare_info(o);
+            auto info = prepare_info(conf);
             boost::asio::async_write(m_socket, boost::asio::buffer(info), boost::asio::transfer_exactly(info.size()),  c[ec]);
             s = handle_error(c);
 

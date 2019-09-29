@@ -59,7 +59,12 @@ int main()
             // timer cancel will only be invoked once the coroutine yields.
             //            assert(error == boost::asio::error::operation_aborted);
         });
-        conn->start("127.0.0.1", 4222);
+        nats_asio::connect_config conf;
+        conf.address = "127.0.0.1";
+        conf.port = 4222;
+        conf.user = "admin";
+        conf.password = "123";
+        conn->start(conf);
         ioc.run();
     }
     catch (const std::exception& e)

@@ -25,11 +25,31 @@ typedef std::function<void(iconnection* conn, ctx c)> on_connected;
 typedef std::function<void(iconnection* conn, ctx c)> on_disconnected;
 
 
+struct connect_config
+{
+    std::string address;
+    uint16_t port;
+
+    bool verbose = false;
+    bool pedantic = false;
+    bool ssl_required = false;
+    bool ssl = false;
+    bool ssl_verify = true;
+
+    optional<std::string> user;
+    optional<std::string> password;
+    optional<std::string> token;
+
+    optional<std::string> ssl_key;
+    optional<std::string> ssl_cert;
+    optional<std::string> ssl_ca;
+};
+
 struct iconnection
 {
     virtual ~iconnection() = default;
 
-    virtual void start(string_view address, uint16_t port) = 0;
+    virtual void start(const connect_config& conf) = 0;
 
     virtual void stop() = 0;
 
