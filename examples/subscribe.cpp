@@ -39,9 +39,17 @@ int main()
         {
             boost::asio::deadline_timer timer(ioc);
             boost::system::error_code error;
+            const std::string msg {"{ \"something\": 123 }"};
 
             for (;;)
             {
+                auto s = conn->publish("publish", msg.data(), msg.size(), {}, ctx);
+
+                if (s.failed())
+                {
+                    console->error("publish failed {}", s.error());
+                }
+
                 console->info("on timer msgs: {}", counter);
                 timer.expires_from_now(boost::posix_time::seconds(1));
                 timer.async_wait(ctx[error]);

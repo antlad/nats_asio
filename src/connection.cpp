@@ -8,6 +8,7 @@
 #include <boost/algorithm/string.hpp>
 
 #include <nlohmann/json.hpp>
+#include <utility>
 
 namespace nats_asio {
 
@@ -38,12 +39,12 @@ std::string connection::prepare_info(const connect_config& o)
     using nlohmann::json;
     json j =
     {
-        {"verbose", o.verbose ? true : false},
-        {"pedantic", o.pedantic ? true : false},
-        {"ssl_required", o.ssl_required ? true : false},
-        {"name", name },
-        {"lang", lang },
-        {"version", version},
+        {"verbose",      o.verbose},
+        {"pedantic",     o.pedantic},
+        {"ssl_required", o.ssl_required},
+        {"name",             name },
+        {"lang",             lang },
+        {"version",          version},
     };
 
     if (o.user.has_value())
@@ -188,7 +189,7 @@ status connection::handle_error(ctx c)
 
             if (m_disconnected_cb != nullptr)
             {
-                m_disconnected_cb(*this, c);
+                m_disconnected_cb(*this, std::move(c));
             }
         }
 
@@ -218,9 +219,9 @@ status connection::publish(string_view subject, const char* raw, std::size_t n, 
         header = fmt::format(pub_header_payload, subject, "", n);
     }
 
-    buffers.push_back(boost::asio::buffer(header));
-    buffers.push_back(boost::asio::buffer(raw, n));
-    buffers.push_back(boost::asio::buffer("\r\n"));
+    buffers.emplace_back(boost::asio::buffer(header.data(), header.size()));
+    buffers.emplace_back(boost::asio::buffer(raw, n));
+    buffers.emplace_back(boost::asio::buffer("\r\n", 2));
     std::size_t total_size = header.size() + n + 4;
     boost::asio::async_write(m_socket, buffers, boost::asio::transfer_exactly(total_size),  c[ec]);
     return  handle_error(c);
@@ -282,7 +283,6 @@ std::pair<isubscription_sptr, status> connection::subscribe(string_view subject,
 void connection::on_ping(ctx c)
 {
     m_log->trace("ping recived");
-    boost::system::error_code ec;
     const std::string pong("PONG\r\n");
     boost::asio::async_write(m_socket, boost::asio::buffer(pong), boost::asio::transfer_exactly(pong.size()),  c[ec]);
     handle_error(c);
@@ -352,7 +352,7 @@ void connection::on_message(string_view subject, string_view sid_str, optional<s
     if (it->second->m_cancel)
     {
         m_log->trace("subscribtion canceled {}", sid);
-        auto s = unsubscribe(it->second, c);
+        s = unsubscribe(it->second, c);
 
         if (s.failed())
         {

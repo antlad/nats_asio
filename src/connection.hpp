@@ -70,7 +70,6 @@ private:
     boost::system::error_code ec;
 
     boost::asio::streambuf m_buf;
-    //    std::vector<char> m_payload_buf;
 };
 
 
