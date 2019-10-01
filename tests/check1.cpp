@@ -129,6 +129,7 @@ TEST(payload_messages, on_message)
     std::string payload2 = fmt::format("MSG {} {} {} {}\r\n{}\r\n", subject, sid, reply_to, msg_size, msg);
     EXPECT_CALL(m, on_message(subject, sid, optional<string_view>(), msg_size, testing::_)).Times(1);
     EXPECT_CALL(m, on_message(subject, sid, optional<string_view>(reply_to), msg_size, testing::_)).Times(1);
+    EXPECT_CALL(m, consumed(msg_size + 2)).Times(2);
     async_process([&](auto c)
     {
         std::stringstream ss(payload);
@@ -143,31 +144,32 @@ TEST(payload_messages, on_message)
 
 TEST(payload_messages, on_message_binary)
 {
-    //    parser_mock m;
-    //    string_view sid("6789654");
-    //    string_view subject("sub1.1");
-    //    std::size_t msg_size = 10;
-    //    std::vector<char> binary_payload(msg_size);
-    //    for (std::size_t i = 0; i < msg_size; ++i)
-    //    {
-    //        binary_payload[i] = static_cast<char>(i);
-    //    }
-    //    std::vector<char> buffer;
-    //    auto payload_header = fmt::format("MSG {} {} {}\r\n", subject, sid, msg_size);
-    //    std::copy(payload_header.begin(), payload_header.end(), std::back_insert_iterator(buffer));
-    //    std::copy(binary_payload.begin(), binary_payload.end(), std::back_insert_iterator(buffer));
-    //    buffer.push_back('\r');
-    //    buffer.push_back('\n');
-    //    std::string header;
-    //    //    std::string fail_payload;
-    //    EXPECT_CALL(m, on_message(subject, sid, optional<string_view>(), msg_size, testing::_)).Times(1);
-    //    async_process([&](auto c)
-    //    {
-    //        std::stringstream ss2(payload_header);
-    //        auto s1 = parse_header(header, ss2, &m, c);
-    //        EXPECT_EQ(false, s1.failed());
-    //        //        EXPECT_EQ(n1, buffer.size());
-    //    });
+    parser_mock m;
+    string_view sid("6789654");
+    string_view subject("sub1.1");
+    std::size_t msg_size = 10;
+    std::vector<char> binary_payload(msg_size);
+
+    for (std::size_t i = 0; i < msg_size; ++i)
+    {
+        binary_payload[i] = static_cast<char>(i);
+    }
+
+    std::vector<char> buffer;
+    auto payload_header = fmt::format("MSG {} {} {}\r\n", subject, sid, msg_size);
+    std::copy(payload_header.begin(), payload_header.end(), std::back_inserter(buffer));
+    std::copy(binary_payload.begin(), binary_payload.end(), std::back_inserter(buffer));
+    buffer.push_back('\r');
+    buffer.push_back('\n');
+    std::string header;
+    EXPECT_CALL(m, on_message(subject, sid, optional<string_view>(), msg_size, testing::_)).Times(1);
+    EXPECT_CALL(m, consumed(msg_size + 2)).Times(1);
+    async_process([&](auto c)
+    {
+        std::stringstream ss2(payload_header);
+        auto s1 = parse_header(header, ss2, &m, c);
+        EXPECT_EQ(false, s1.failed());
+    });
 }
 
 
@@ -194,6 +196,7 @@ TEST(payload_messages, on_message_not_full)
     std::string header;
     auto payload = fmt::format("MSG {} {} {}\r\n{}", subject, sid, msg_size, msg);
     EXPECT_CALL(m, on_message(subject, sid, optional<string_view>(), msg_size, testing::_)).Times(1);
+    EXPECT_CALL(m, consumed(msg_size + 2)).Times(1);
     async_process([&](auto c)
     {
         std::stringstream ss(payload);
