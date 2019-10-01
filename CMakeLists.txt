@@ -45,7 +45,6 @@ set(nats_asio_PUB_INCLUDES
 	)
 
 set(nats_asio_SRCS
-
 	"src/connection.hpp"
 	"src/structs.hpp"
 	"src/parser.hpp"
@@ -59,8 +58,8 @@ add_library(nats_asio ${nats_asio_SRCS} ${nats_asio_PUB_INCLUDES})
 target_link_libraries(nats_asio  pthread "${Boost_COROUTINE_LIBRARIES}" OpenSSL::Crypto OpenSSL::SSL fmt::fmt)
 
 if (ENABLE_EXAMPLES)
-	add_executable(subscribe examples/subscribe.cpp)
-	target_link_libraries(subscribe nats_asio)
+	add_executable(nats_tool examples/nats_tool.cpp)
+	target_link_libraries(nats_tool nats_asio)
 endif()
 
 install(TARGETS nats_asio DESTINATION "${CMAKE_INSTALL_PREFIX}/lib/")

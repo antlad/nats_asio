@@ -1,5 +1,6 @@
 #include "connection.hpp"
 #include "structs.hpp"
+#include "json.hpp"
 
 #include <boost/asio/ip/tcp.hpp>
 #include <boost/asio/buffer.hpp>
@@ -7,7 +8,6 @@
 #include <boost/asio/read.hpp>
 #include <boost/algorithm/string.hpp>
 
-#include <nlohmann/json.hpp>
 #include <utility>
 
 namespace nats_asio {
@@ -185,7 +185,7 @@ status connection::handle_error(ctx c)
         if ((ec == boost::asio::error::eof) || (boost::asio::error::connection_reset == ec))
         {
             m_is_connected = false;
-            m_socket.close(ec);// TODO: handle it
+            m_socket.close(ec);// TODO: handle it if error
 
             if (m_disconnected_cb != nullptr)
             {
