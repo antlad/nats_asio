@@ -2,7 +2,7 @@
 
 #include <memory>
 #include <boost/optional.hpp>
-#include <boost/utility/string_view.hpp>
+#include <boost/utility/string_view_fwd.hpp>
 
 namespace nats_asio {
 struct options;

@@ -4,6 +4,8 @@
 
 #include <fmt/format.h>
 
+#include <boost/utility/string_view.hpp>
+
 #include <stdexcept>
 
 

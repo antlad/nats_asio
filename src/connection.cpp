@@ -1,12 +1,10 @@
 #include "connection.hpp"
-#include "structs.hpp"
 #include "json.hpp"
 
 #include <boost/asio/ip/tcp.hpp>
 #include <boost/asio/buffer.hpp>
 #include <boost/asio/read_until.hpp>
 #include <boost/asio/read.hpp>
-#include <boost/algorithm/string.hpp>
 
 #include <utility>
 
@@ -81,6 +79,7 @@ connection::connection(const logger& log, aio& io, const on_connected_cb& connec
     , m_is_connected(false)
     , m_stop_flag(false)
     , m_socket(m_io)
+    , m_max_payload(0)
     , m_connected_cb(connected_cb)
     , m_disconnected_cb(disconnected_cb)
 {

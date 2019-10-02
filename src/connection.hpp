@@ -1,3 +1,6 @@
+#pragma clang diagnostic push
+#pragma ide diagnostic ignored "modernize-use-override"
+#pragma ide diagnostic ignored "cppcoreguidelines-explicit-virtual-functions"
 #pragma once
 
 #include "parser.hpp"
@@ -77,3 +80,5 @@ private:
 }
 
 
+
+#pragma clang diagnostic pop
