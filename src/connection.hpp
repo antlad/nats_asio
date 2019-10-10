@@ -1,6 +1,3 @@
-#pragma clang diagnostic push
-#pragma ide diagnostic ignored "modernize-use-override"
-#pragma ide diagnostic ignored "cppcoreguidelines-explicit-virtual-functions"
 #pragma once
 
 #include "parser.hpp"
@@ -18,67 +15,68 @@
 namespace nats_asio {
 
 class connection
-    : public iconnection
-    , public parser_observer {
+	: public iconnection
+	, public parser_observer {
 public:
-    connection(const logger& log, aio& io, const on_connected_cb& connected_cb, const on_disconnected_cb& disconnected_cb);
+	connection(const logger& log, aio& io, const on_connected_cb& connected_cb, const on_disconnected_cb& disconnected_cb);
 
-    virtual void start(const connect_config& conf) override;
+	virtual void start(const connect_config& conf) override;
 
-    virtual void stop() override;
+	virtual void stop() override;
 
-    virtual bool is_connected() override;
+	virtual bool is_connected() override;
 
-    virtual status publish(string_view subject, const char* raw, std::size_t n, optional<string_view> reply_to, ctx c) override;
+	virtual status publish(string_view subject, const char* raw, std::size_t n, optional<string_view> reply_to, ctx c) override;
 
-    virtual status unsubscribe(const isubscription_sptr& p, ctx c) override;
+	virtual status unsubscribe(const isubscription_sptr& p, ctx c) override;
 
-    virtual std::pair<isubscription_sptr, status> subscribe(string_view subject,  optional<string_view> queue, on_message_cb cb, ctx c) override;
+	virtual std::pair<isubscription_sptr, status> subscribe(string_view subject,  optional<string_view> queue, on_message_cb cb, ctx c) override;
 
 private:
-    virtual void on_ping(ctx c) override;
+	virtual void on_ping(ctx c) override;
 
-    virtual void on_pong(ctx c) override;
+	virtual void on_pong(ctx c) override;
 
-    virtual void on_ok(ctx c) override;
+	virtual void on_ok(ctx c) override;
 
-    virtual void on_error(string_view err, ctx c) override;
+	virtual void on_error(string_view err, ctx c) override;
 
-    virtual void on_info(string_view info, ctx c) override;
+	virtual void on_info(string_view info, ctx c) override;
 
-    virtual void on_message(string_view subject, string_view sid, optional<string_view> reply_to, std::size_t n, ctx c) override;
+	virtual void on_message(string_view subject, string_view sid, optional<string_view> reply_to, std::size_t n, ctx c) override;
 
-    virtual void consumed(std::size_t n) override;
+	virtual void consumed(std::size_t n) override;
 
-    void run(const connect_config& conf, ctx c);
+	void run(const connect_config& conf, ctx c);
 
-    status handle_error(ctx c);
+	void load_certificates(const std::string& cert_key_file,
+						   const std::string& cert_file,
+						   const std::string& dh_file);
 
-    std::string prepare_info(const connect_config& o);
+	status handle_error(ctx c);
 
-    uint64_t next_sid();
+	std::string prepare_info(const connect_config& o);
 
-    uint64_t m_sid;
-    std::size_t m_max_payload;
-    logger m_log;
-    aio& m_io;
+	uint64_t next_sid();
 
-    bool m_is_connected;
-    bool m_stop_flag;
+	uint64_t m_sid;
+	std::size_t m_max_payload;
+	logger m_log;
+	aio& m_io;
 
-    std::unordered_map<uint64_t, subscription_sptr> m_subs;
-    boost::asio::ip::tcp::socket m_socket;
-    on_connected_cb m_connected_cb;
-    on_disconnected_cb m_disconnected_cb;
-    boost::system::error_code ec;
+	bool m_is_connected;
+	bool m_stop_flag;
 
-    boost::asio::streambuf m_buf;
+	std::unordered_map<uint64_t, subscription_sptr> m_subs;
+	boost::asio::ip::tcp::socket m_socket;
+	on_connected_cb m_connected_cb;
+	on_disconnected_cb m_disconnected_cb;
+	boost::system::error_code ec;
+
+	boost::asio::ssl::context m_ssl_ctx;
+	boost::asio::streambuf m_buf;
 };
 
 
 
 }
-
-
-
-#pragma clang diagnostic pop
