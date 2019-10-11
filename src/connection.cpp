@@ -16,8 +16,10 @@ struct subscription: public isubscription
 		: m_cancel(false)
 		, m_cb(cb)
 		, m_sid(sid)
+
 	{
 	}
+
 
 	virtual void cancel() override;
 
@@ -75,18 +77,17 @@ uint64_t connection::next_sid()
 	return m_sid++;
 }
 
-
 connection::connection(const logger& log, aio& io, const on_connected_cb& connected_cb, const on_disconnected_cb& disconnected_cb)
 	: m_sid(0)
+	, m_max_payload(0)
 	, m_log(log)
 	, m_io(io)
 	, m_is_connected(false)
 	, m_stop_flag(false)
-	, m_socket(m_io)
-	, m_max_payload(0)
 	, m_connected_cb(connected_cb)
 	, m_disconnected_cb(disconnected_cb)
 	, m_ssl_ctx(boost::asio::ssl::context::tls_client)
+	, m_socket(m_ssl_ctx, m_io)
 {
 }
 
@@ -157,18 +158,15 @@ void connection::run(const connect_config& conf, ctx c)
 
 		if (!m_is_connected)
 		{
-			auto addr = boost::asio::ip::make_address(conf.address);
-			m_socket.async_connect(boost::asio::ip::tcp::endpoint(addr, conf.port), c[ec]);
-			auto s = handle_error(c);
+			m_socket.async_connect(conf.address, conf.port, c[ec]);
 
-			if (s.failed())
+			if (handle_error(c).failed())
 			{
-				m_log->error("connect failed {}", s.error());
 				continue;
 			}
 
-			boost::asio::async_read_until(m_socket, m_buf, "\r\n", c[ec]);
-			s = handle_error(c);
+			m_socket.async_read_until(m_buf, c[ec]);
+			auto s = handle_error(c);
 
 			if (s.failed())
 			{
@@ -186,7 +184,13 @@ void connection::run(const connect_config& conf, ctx c)
 			}
 
 			auto info = prepare_info(conf);
-			boost::asio::async_write(m_socket, boost::asio::buffer(info), boost::asio::transfer_exactly(info.size()),  c[ec]);
+			m_socket.async_write(boost::asio::buffer(info),
+								 boost::asio::transfer_exactly(info.size()),
+								 c[ec]);
+			//boost::asio::async_write(m_socket,
+			//									 boost::asio::buffer(info),
+			//									 boost::asio::transfer_exactly(info.size()),
+			//									 c[ec]);
 			s = handle_error(c);
 
 			if (s.failed())
@@ -203,7 +207,8 @@ void connection::run(const connect_config& conf, ctx c)
 			}
 		}
 
-		boost::asio::async_read_until(m_socket, m_buf, "\r\n", c[ec]);
+		m_socket.async_read_until(m_buf, c[ec]);
+		//boost::asio::async_read_until(m_socket, m_buf, "\r\n", c[ec]);
 		auto s = handle_error(c);
 
 		if (s.failed())
@@ -230,7 +235,7 @@ status connection::handle_error(ctx c)
 		if ((ec == boost::asio::error::eof) || (boost::asio::error::connection_reset == ec))
 		{
 			m_is_connected = false;
-			m_socket.close(ec);// TODO: handle it if error
+			m_socket.close(ec); // TODO: handle it if error
 
 			if (m_disconnected_cb != nullptr)
 			{
@@ -268,8 +273,9 @@ status connection::publish(string_view subject, const char* raw, std::size_t n, 
 	buffers.emplace_back(boost::asio::buffer(raw, n));
 	buffers.emplace_back(boost::asio::buffer("\r\n", 2));
 	std::size_t total_size = header.size() + n + 4;
-	boost::asio::async_write(m_socket, buffers, boost::asio::transfer_exactly(total_size),  c[ec]);
-	return  handle_error(c);
+	m_socket.async_write(buffers, boost::asio::transfer_exactly(total_size), c[ec]);
+	//boost::asio::async_write(m_socket, buffers, boost::asio::transfer_exactly(total_size), c[ec]);
+	return handle_error(c);
 }
 
 status connection::unsubscribe(const isubscription_sptr& p, ctx c)
@@ -283,7 +289,9 @@ status connection::unsubscribe(const isubscription_sptr& p, ctx c)
 
 	m_subs.erase(it);
 	const std::string unsub_payload("UNSUB {}\r\n");
-	boost::asio::async_write(m_socket, boost::asio::buffer(unsub_payload), boost::asio::transfer_exactly(unsub_payload.size()),  c[ec]);
+	m_socket.async_write(boost::asio::buffer(unsub_payload),
+						 boost::asio::transfer_exactly(unsub_payload.size()),
+						 c[ec]);
 	return handle_error(c);
 }
 
@@ -312,7 +320,13 @@ std::pair<isubscription_sptr, status> connection::subscribe(string_view subject,
 		payload = fmt::format(sub_payload, subject, "", sid);
 	}
 
-	boost::asio::async_write(m_socket, boost::asio::buffer(payload), boost::asio::transfer_exactly(payload.size()),  c[ec]);
+	m_socket.async_write(boost::asio::buffer(payload),
+						 boost::asio::transfer_exactly(payload.size()),
+						 c[ec]);
+	//	boost::asio::async_write(m_socket,
+	//							 boost::asio::buffer(payload),
+	//							 boost::asio::transfer_exactly(payload.size()),
+	//							 c[ec]);
 	auto s = handle_error(c);
 
 	if (s.failed())
@@ -329,7 +343,9 @@ void connection::on_ping(ctx c)
 {
 	m_log->trace("ping recived");
 	const std::string pong("PONG\r\n");
-	boost::asio::async_write(m_socket, boost::asio::buffer(pong), boost::asio::transfer_exactly(pong.size()),  c[ec]);
+	m_socket.async_write(boost::asio::buffer(pong),
+						 boost::asio::transfer_exactly(pong.size()),
+						 c[ec]);
 	handle_error(c);
 }
 
@@ -363,7 +379,9 @@ void connection::on_message(string_view subject, string_view sid_str, optional<s
 
 	if (bytes_to_transsfer > 0)
 	{
-		boost::asio::async_read(m_socket, m_buf, boost::asio::transfer_at_least(std::size_t(bytes_to_transsfer)), c[ec]);
+		m_socket.async_read(m_buf,
+							boost::asio::transfer_at_least(std::size_t(bytes_to_transsfer)),
+							c[ec]);
 	}
 
 	auto s = handle_error(c);
@@ -390,7 +408,9 @@ void connection::on_message(string_view subject, string_view sid_str, optional<s
 
 	if (it == m_subs.end())
 	{
-		m_log->trace("dropping message because subscription not found: topic: {}, sid: {}", subject, sid_str);
+		m_log->trace("dropping message because subscription not found: topic: {}, sid: {}",
+					 subject,
+					 sid_str);
 		return;
 	}
 

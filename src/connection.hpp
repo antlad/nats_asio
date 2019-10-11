@@ -1,6 +1,5 @@
-#pragma once
-
 #include "parser.hpp"
+#include "socket.hpp"
 
 #include <nats_asio/fwd.hpp>
 #include <nats_asio/defs.hpp>
@@ -14,11 +13,13 @@
 
 namespace nats_asio {
 
-class connection
-	: public iconnection
-	, public parser_observer {
+class connection : public iconnection, public parser_observer {
 public:
-	connection(const logger& log, aio& io, const on_connected_cb& connected_cb, const on_disconnected_cb& disconnected_cb);
+	connection(const logger& log,
+			   aio& io,
+			   const on_connected_cb& connected_cb,
+			   const on_disconnected_cb& disconnected_cb);
+
 
 	virtual void start(const connect_config& conf) override;
 
@@ -32,6 +33,7 @@ public:
 
 	virtual std::pair<isubscription_sptr, status> subscribe(string_view subject,  optional<string_view> queue, on_message_cb cb, ctx c) override;
 
+
 private:
 	virtual void on_ping(ctx c) override;
 
@@ -42,6 +44,7 @@ private:
 	virtual void on_error(string_view err, ctx c) override;
 
 	virtual void on_info(string_view info, ctx c) override;
+
 
 	virtual void on_message(string_view subject, string_view sid, optional<string_view> reply_to, std::size_t n, ctx c) override;
 
@@ -66,15 +69,13 @@ private:
 	bool m_stop_flag;
 
 	std::unordered_map<uint64_t, subscription_sptr> m_subs;
-	boost::asio::ip::tcp::socket m_socket;
 	on_connected_cb m_connected_cb;
 	on_disconnected_cb m_disconnected_cb;
 	boost::system::error_code ec;
 
-	boost::asio::ssl::context m_ssl_ctx;
 	boost::asio::streambuf m_buf;
+	boost::asio::ssl::context m_ssl_ctx;
+	uni_socket m_socket;
 };
+} // namespace nats_asio
 
-
-
-}
