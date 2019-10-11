@@ -56,19 +56,19 @@ private:
 	bool m_print_to_stdout;
 };
 
-nats_asio::optional<std::string> read_file(const std::shared_ptr<spdlog::logger>& console, const std::string& path)
+std::string read_file(const std::shared_ptr<spdlog::logger>& console, const std::string& path)
 {
 	try
 	{
 		if (path.empty())
-			return{};
+		{
+			return {};
+		}
 
 		std::ifstream t(path);
-
 		std::string str((std::istreambuf_iterator<char>(t)),
 						std::istreambuf_iterator<char>());
-
-		return {str};
+		return str;
 	}
 	catch (const std::exception& e)
 	{
@@ -140,12 +140,13 @@ int main(int argc, char* argv[])
 
 		if (result.count("ssl"))
 		{
-			nats_asio::ssl_config ssl_conf;
-			ssl_conf.ssl_ca = read_file(console, ssl_ca);
-			ssl_conf.ssl_dh = read_file(console, ssl_dh);
-			ssl_conf.ssl_cert = read_file(console, ssl_cert);
-			ssl_conf.ssl_key = read_file(console, ssl_key);
-			conf.ssl = ssl_conf;
+			conf.ssl = nats_asio::ssl_config
+			{
+				read_file(console, ssl_key),
+				read_file(console, ssl_cert),
+				read_file(console, ssl_ca),
+				read_file(console, ssl_dh),
+			};
 		}
 
 		if (topic.empty())

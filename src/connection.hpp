@@ -50,6 +50,8 @@ private:
 
 	virtual void consumed(std::size_t n) override;
 
+	status do_connect(const connect_config& conf, ctx c);
+
 	void run(const connect_config& conf, ctx c);
 
 	void load_certificates(const ssl_config& conf);

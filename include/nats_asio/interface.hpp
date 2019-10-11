@@ -27,12 +27,12 @@ typedef std::function<void(iconnection* conn, ctx c)> on_disconnected;
 
 struct ssl_config
 {
+	std::string ssl_key;
+	std::string ssl_cert;
+	std::string ssl_ca;
+	std::string ssl_dh;
 	bool ssl_required = false;
 	bool ssl_verify = true;
-	optional<std::string> ssl_key;
-	optional<std::string> ssl_cert;
-	optional<std::string> ssl_ca;
-	optional<std::string> ssl_dh;
 };
 
 struct connect_config

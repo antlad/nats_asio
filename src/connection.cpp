@@ -20,7 +20,6 @@ struct subscription: public isubscription
 	{
 	}
 
-
 	virtual void cancel() override;
 
 	virtual uint64_t sid() override;
@@ -112,7 +111,11 @@ void connection::load_certificates(const ssl_config& conf)
 	m_ssl_ctx.set_options(
 		boost::asio::ssl::context::default_workarounds |
 		boost::asio::ssl::context::no_sslv2 |
-		boost::asio::ssl::context::single_dh_use);
+		boost::asio::ssl::context::no_sslv3 |
+		boost::asio::ssl::context::no_tlsv1 |
+		boost::asio::ssl::context::single_dh_use |
+		boost::asio::ssl::context::tls_client
+	);
 
 	if (conf.ssl_verify)
 	{
@@ -123,30 +126,90 @@ void connection::load_certificates(const ssl_config& conf)
 		m_ssl_ctx.set_verify_mode(boost::asio::ssl::verify_none);
 	}
 
-	if (conf.ssl_cert.has_value())
+	if (!conf.ssl_cert.empty())
 	{
-		m_ssl_ctx.use_certificate(boost::asio::buffer(conf.ssl_cert->data(), conf.ssl_cert->size()), boost::asio::ssl::context::file_format::pem);
+		m_ssl_ctx.use_certificate(boost::asio::buffer(conf.ssl_cert.data(), conf.ssl_cert.size()), boost::asio::ssl::context::file_format::pem);
 	}
 
-	if (conf.ssl_ca.has_value())
+	if (!conf.ssl_ca.empty())
 	{
-		m_ssl_ctx.use_certificate_chain(boost::asio::buffer(conf.ssl_ca->data(), conf.ssl_ca->size()));
+		m_ssl_ctx.use_certificate_chain(boost::asio::buffer(conf.ssl_ca.data(), conf.ssl_ca.size()));
 	}
 
-	if (conf.ssl_dh.has_value())
+	if (!conf.ssl_dh.empty())
 	{
-		m_ssl_ctx.use_tmp_dh_file(conf.ssl_dh.value());
+		m_ssl_ctx.use_tmp_dh_file(conf.ssl_dh);
 	}
 
-	if (conf.ssl_key.has_value())
+	if (!conf.ssl_key.empty())
 	{
-		m_ssl_ctx.use_private_key(boost::asio::buffer(conf.ssl_key->data(), conf.ssl_key->size()), boost::asio::ssl::context::file_format::pem);
+		m_ssl_ctx.use_private_key(boost::asio::buffer(conf.ssl_key.data(), conf.ssl_key.size()), boost::asio::ssl::context::file_format::pem);
 	}
+}
+
+
+status connection::do_connect(const connect_config& conf, ctx c)
+{
+	m_socket.async_connect(conf.address, conf.port, c[ec]);
+	auto s = handle_error(c);
+
+	if (s.failed())
+	{
+		return s;
+	}
+
+	m_socket.async_handshake(c[ec]);
+	s = handle_error(c);
+
+	if (s.failed())
+	{
+		m_log->error("async handshake failed {}", s.error());
+		return s;
+	}
+
+	m_socket.async_read_until(m_buf, c[ec]);
+	s = handle_error(c);
+
+	if (s.failed())
+	{
+		m_log->error("read server info failed {}", s.error());
+		return s;
+	}
+
+	std::string header;
+	std::istream is(&m_buf);
+	s = parse_header(header, is, this, c);
+
+	if (s.failed())
+	{
+		m_log->error("process message failed with error: {}", s.error());
+		return s;
+	}
+
+	auto info = prepare_info(conf);
+	m_socket.async_write(boost::asio::buffer(info),
+						 boost::asio::transfer_exactly(info.size()),
+						 c[ec]);
+	s = handle_error(c);
+
+	if (s.failed())
+	{
+		m_log->error("failed to write info {}", s.error());
+		return s;
+	}
+
+	return {};
 }
 
 void connection::run(const connect_config& conf, ctx c)
 {
 	std::string header;
+
+	if (conf.ssl.has_value())
+	{
+		m_socket.set_use_ssl(true);
+		load_certificates(conf.ssl.value());
+	}
 
 	for (;;)
 	{
@@ -158,44 +221,11 @@ void connection::run(const connect_config& conf, ctx c)
 
 		if (!m_is_connected)
 		{
-			m_socket.async_connect(conf.address, conf.port, c[ec]);
-
-			if (handle_error(c).failed())
-			{
-				continue;
-			}
-
-			m_socket.async_read_until(m_buf, c[ec]);
-			auto s = handle_error(c);
+			auto s = do_connect(conf, c);
 
 			if (s.failed())
 			{
-				m_log->error("read server info failed {}", s.error());
-				continue;
-			}
-
-			std::istream is(&m_buf);
-			s = parse_header(header, is, this, c);
-
-			if (s.failed())
-			{
-				m_log->error("process message failed with error: {}", s.error());
-				continue;
-			}
-
-			auto info = prepare_info(conf);
-			m_socket.async_write(boost::asio::buffer(info),
-								 boost::asio::transfer_exactly(info.size()),
-								 c[ec]);
-			//boost::asio::async_write(m_socket,
-			//									 boost::asio::buffer(info),
-			//									 boost::asio::transfer_exactly(info.size()),
-			//									 c[ec]);
-			s = handle_error(c);
-
-			if (s.failed())
-			{
-				m_log->error("failed to write info {}", s.error());
+				m_log->error("connect failed with error {}", s.error());
 				continue;
 			}
 
@@ -208,7 +238,6 @@ void connection::run(const connect_config& conf, ctx c)
 		}
 
 		m_socket.async_read_until(m_buf, c[ec]);
-		//boost::asio::async_read_until(m_socket, m_buf, "\r\n", c[ec]);
 		auto s = handle_error(c);
 
 		if (s.failed())
@@ -232,18 +261,24 @@ status connection::handle_error(ctx c)
 {
 	if (ec.failed())
 	{
-		if ((ec == boost::asio::error::eof) || (boost::asio::error::connection_reset == ec))
-		{
-			m_is_connected = false;
-			m_socket.close(ec); // TODO: handle it if error
+		//		if ((ec == boost::asio::error::eof) || (boost::asio::error::connection_reset == ec))
+		//		{
+		auto original_msg = ec.message();
+		m_is_connected = false;
+		m_socket.close(ec); // TODO: handle it if error
 
-			if (m_disconnected_cb != nullptr)
-			{
-				m_disconnected_cb(*this, std::move(c));
-			}
+		if (ec.failed())
+		{
+			m_log->error("error on socket close {}", ec.message());
 		}
 
-		return status(ec.message());
+		if (m_disconnected_cb != nullptr)
+		{
+			m_disconnected_cb(*this, std::move(c));
+		}
+
+		//		}
+		return status(original_msg);
 	}
 
 	return {};
@@ -274,7 +309,6 @@ status connection::publish(string_view subject, const char* raw, std::size_t n, 
 	buffers.emplace_back(boost::asio::buffer("\r\n", 2));
 	std::size_t total_size = header.size() + n + 4;
 	m_socket.async_write(buffers, boost::asio::transfer_exactly(total_size), c[ec]);
-	//boost::asio::async_write(m_socket, buffers, boost::asio::transfer_exactly(total_size), c[ec]);
 	return handle_error(c);
 }
 
@@ -323,10 +357,6 @@ std::pair<isubscription_sptr, status> connection::subscribe(string_view subject,
 	m_socket.async_write(boost::asio::buffer(payload),
 						 boost::asio::transfer_exactly(payload.size()),
 						 c[ec]);
-	//	boost::asio::async_write(m_socket,
-	//							 boost::asio::buffer(payload),
-	//							 boost::asio::transfer_exactly(payload.size()),
-	//							 c[ec]);
 	auto s = handle_error(c);
 
 	if (s.failed())
