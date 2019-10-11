@@ -38,5 +38,6 @@ build/*
 .vscode/c_cpp_properties.json
 CMakeLists.txt.user
 Testing/*
+cmake-build-debug-gcc8
 build/CMakeCache.txt
 build_debug/*

@@ -46,11 +46,11 @@ set(nats_asio_PUB_INCLUDES
 
 set(nats_asio_SRCS
 	"src/connection.hpp"
-	"src/structs.hpp"
 	"src/parser.hpp"
 	"src/common.cpp"
 	"src/connection.cpp"
 	"src/parser.cpp"
+	"src/socket.hpp"
 )
 
 
