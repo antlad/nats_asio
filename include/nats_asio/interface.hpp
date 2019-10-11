@@ -25,6 +25,16 @@ typedef std::function<void(iconnection* conn, ctx c)> on_connected;
 typedef std::function<void(iconnection* conn, ctx c)> on_disconnected;
 
 
+struct ssl_config
+{
+	bool ssl_required = false;
+	bool ssl_verify = true;
+	optional<std::string> ssl_key;
+	optional<std::string> ssl_cert;
+	optional<std::string> ssl_ca;
+	optional<std::string> ssl_dh;
+};
+
 struct connect_config
 {
 	std::string address;
@@ -32,17 +42,11 @@ struct connect_config
 
 	bool verbose = false;
 	bool pedantic = false;
-	bool ssl_required = false;
-	bool ssl = false;
-	bool ssl_verify = true;
 
 	optional<std::string> user;
 	optional<std::string> password;
 	optional<std::string> token;
-
-	optional<std::string> ssl_key;
-	optional<std::string> ssl_cert;
-	optional<std::string> ssl_ca;
+	optional<ssl_config> ssl;
 };
 
 struct iconnection

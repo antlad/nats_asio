@@ -9,7 +9,7 @@
 
 #include <iostream>
 #include <tuple>
-
+#include <fstream>
 
 const std::string grub_mode = "grub";
 const std::string gen_mode = "gen";
@@ -56,6 +56,28 @@ private:
 	bool m_print_to_stdout;
 };
 
+nats_asio::optional<std::string> read_file(const std::shared_ptr<spdlog::logger>& console, const std::string& path)
+{
+	try
+	{
+		if (path.empty())
+			return{};
+
+		std::ifstream t(path);
+
+		std::string str((std::istreambuf_iterator<char>(t)),
+						std::istreambuf_iterator<char>());
+
+		return {str};
+	}
+	catch (const std::exception& e)
+	{
+		console->error("failed to read file {}, with error: {}", path, e.what());
+	}
+
+	return {};
+}
+
 
 int main(int argc, char* argv[])
 {
@@ -72,10 +94,13 @@ int main(int argc, char* argv[])
 		int stats_interval = 1;
 		int publish_interval = -1;
 		bool print_to_stdout = false;
+		std::string ssl_key;
+		std::string ssl_cert;
+		std::string ssl_ca;
+		std::string ssl_dh;
 		options.add_options()
 		("h,help", "Print help")
 		("d,debug", "Enable debugging")
-		("ssl", "Enable ssl")
 		("address", "Address of NATS server", cxxopts::value<std::string>(conf.address))
 		("port", "Port of NATS server", cxxopts::value<uint16_t >(conf.port))
 		("user", "Username", cxxopts::value<std::string >(username))
@@ -85,6 +110,11 @@ int main(int argc, char* argv[])
 		("stats_interval", "stat interval seconds", cxxopts::value<int>(stats_interval))
 		("publish_interval", "publish interval seconds in ms", cxxopts::value<int>(publish_interval))
 		("print", "print messages to stdout", cxxopts::value<bool>(print_to_stdout))
+		("ssl", "Enable ssl")
+		("ssl_key", "ssl_key", cxxopts::value<std::string>(ssl_key))
+		("ssl_cert", "ssl_cert", cxxopts::value<std::string>(ssl_cert))
+		("ssl_ca", "ssl_ca", cxxopts::value<std::string>(ssl_ca))
+		("ssl_dh", "ssl_dh", cxxopts::value<std::string>(ssl_dh))
 		;
 		options.parse_positional({"mode"});
 		auto result = options.parse(argc, argv);
@@ -95,15 +125,27 @@ int main(int argc, char* argv[])
 			return 0;
 		}
 
+		auto console = spdlog::stdout_color_mt("console");
+
+		if (result.count("debug"))
+		{
+			console->set_level(spdlog::level::debug);
+		}
+
 		if (result.count("mode") == 0)
 		{
-			std::cerr << "Please specify mode" << std::endl;
+			console->error("Please specify mode");
 			return 1;
 		}
 
 		if (result.count("ssl"))
 		{
-			std::cout << options.help() << std::endl;
+			nats_asio::ssl_config ssl_conf;
+			ssl_conf.ssl_ca = read_file(console, ssl_ca);
+			ssl_conf.ssl_dh = read_file(console, ssl_dh);
+			ssl_conf.ssl_cert = read_file(console, ssl_cert);
+			ssl_conf.ssl_key = read_file(console, ssl_key);
+			conf.ssl = ssl_conf;
 		}
 
 		if (topic.empty())
@@ -115,7 +157,7 @@ int main(int argc, char* argv[])
 
 		if (mode != grub_mode && mode != gen_mode)
 		{
-			std::cerr << fmt::format("Invalid mode. Could be `{}` or `{}`", grub_mode, gen_mode) << std::endl;
+			console->error("Invalid mode. Could be `{}` or `{}`", grub_mode, gen_mode);
 			return 1;
 		}
 
@@ -132,13 +174,6 @@ int main(int argc, char* argv[])
 			{
 				publish_interval = 1000;
 			}
-		}
-
-		auto console = spdlog::stdout_color_mt("console");
-
-		if (result.count("debug"))
-		{
-			console->set_level(spdlog::level::debug);
 		}
 
 		boost::asio::io_context ioc;

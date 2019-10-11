@@ -49,9 +49,7 @@ private:
 
 	void run(const connect_config& conf, ctx c);
 
-	void load_certificates(const std::string& cert_key_file,
-						   const std::string& cert_file,
-						   const std::string& dh_file);
+	void load_certificates(const ssl_config& conf);
 
 	status handle_error(ctx c);
 

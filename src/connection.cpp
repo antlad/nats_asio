@@ -7,7 +7,6 @@
 #include <boost/asio/read.hpp>
 
 #include <utility>
-#include <fstream>
 
 namespace nats_asio {
 
@@ -40,11 +39,15 @@ std::string connection::prepare_info(const connect_config& o)
 	{
 		{"verbose",      o.verbose},
 		{"pedantic",     o.pedantic},
-		{"ssl_required", o.ssl_required},
 		{"name",             name },
 		{"lang",             lang },
 		{"version",          version},
 	};
+
+	if (o.ssl.has_value())
+	{
+		j["ssl_required"] = o.ssl->ssl_required;
+	}
 
 	if (o.user.has_value())
 	{
@@ -102,36 +105,42 @@ void connection::start(const connect_config& conf)
 	boost::asio::spawn(m_io, std::bind(&connection::run, this, conf, std::placeholders::_1));
 }
 
-std::string read_file(const std::string& path)
-{
-	std::ifstream t(path);
-	std::string str((std::istreambuf_iterator<char>(t)),
-					std::istreambuf_iterator<char>());
-	return str;
-}
 
-void connection::load_certificates(const std::string& cert_key_file,
-								   const std::string& cert_file,
-								   const std::string& dh_file)
+void connection::load_certificates(const ssl_config& conf)
 {
-	m_ssl_ctx.set_password_callback(
-		[](std::size_t,
-		   boost::asio::ssl::context_base::password_purpose)
-	{
-		return "test";
-	});
 	m_ssl_ctx.set_options(
 		boost::asio::ssl::context::default_workarounds |
 		boost::asio::ssl::context::no_sslv2 |
 		boost::asio::ssl::context::single_dh_use);
-	auto cert_key = read_file(cert_key_file);
-	auto cert = read_file(cert_file);
-	auto dh = read_file(dh_file);
-	m_ssl_ctx.load_verify_file()
-	m_ssl_ctx.use_certificate_chain(boost::asio::buffer(cert.data(), cert.size()));
-	m_ssl_ctx.use_private_key(boost::asio::buffer(cert_key.data(), cert_key.size()),
-							  boost::asio::ssl::context::file_format::pem);
-	m_ssl_ctx.use_tmp_dh(boost::asio::buffer(dh.data(), dh.size()));
+
+	if (conf.ssl_verify)
+	{
+		m_ssl_ctx.set_verify_mode(boost::asio::ssl::verify_peer);
+	}
+	else
+	{
+		m_ssl_ctx.set_verify_mode(boost::asio::ssl::verify_none);
+	}
+
+	if (conf.ssl_cert.has_value())
+	{
+		m_ssl_ctx.use_certificate(boost::asio::buffer(conf.ssl_cert->data(), conf.ssl_cert->size()), boost::asio::ssl::context::file_format::pem);
+	}
+
+	if (conf.ssl_ca.has_value())
+	{
+		m_ssl_ctx.use_certificate_chain(boost::asio::buffer(conf.ssl_ca->data(), conf.ssl_ca->size()));
+	}
+
+	if (conf.ssl_dh.has_value())
+	{
+		m_ssl_ctx.use_tmp_dh_file(conf.ssl_dh.value());
+	}
+
+	if (conf.ssl_key.has_value())
+	{
+		m_ssl_ctx.use_private_key(boost::asio::buffer(conf.ssl_key->data(), conf.ssl_key->size()), boost::asio::ssl::context::file_format::pem);
+	}
 }
 
 void connection::run(const connect_config& conf, ctx c)
@@ -148,15 +157,18 @@ void connection::run(const connect_config& conf, ctx c)
 
 		if (!m_is_connected)
 		{
-			m_socket.async_connect(boost::asio::ip::tcp::endpoint(boost::asio::ip::make_address(conf.address), conf.port), c[ec]);
+			auto addr = boost::asio::ip::make_address(conf.address);
+			m_socket.async_connect(boost::asio::ip::tcp::endpoint(addr, conf.port), c[ec]);
+			auto s = handle_error(c);
 
-			if (handle_error(c).failed())
+			if (s.failed())
 			{
+				m_log->error("connect failed {}", s.error());
 				continue;
 			}
 
 			boost::asio::async_read_until(m_socket, m_buf, "\r\n", c[ec]);
-			auto s = handle_error(c);
+			s = handle_error(c);
 
 			if (s.failed())
 			{
