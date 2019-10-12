@@ -14,102 +14,94 @@ namespace ssl = boost::asio::ssl;
 
 constexpr auto sep = "\r\n";
 
-class uni_socket {
-public:
-	uni_socket(ssl::context& ctx, aio& io)
-		: m_socket_ssl(io, ctx)
-		, m_socket(io)
-		, m_use_ssl(false)
+typedef boost::asio::ip::tcp::socket raw_socket;
+typedef boost::asio::ssl::stream<boost::asio::ip::tcp::socket> ssl_socket;
+
+template<class Socket>
+struct uni_socket
+{
+	explicit uni_socket(aio& io)
+		: m_socket(io)
 	{}
 
-	void async_connect(std::string address, uint16_t port, ctx c)
-	{
-		if (m_use_ssl)
-		{
-			m_socket_ssl.lowest_layer().async_connect(boost::asio::ip::tcp::endpoint(boost::asio::ip::make_address(address), port), c);
-		}
-		else
-		{
-			m_socket.async_connect(boost::asio::ip::tcp::endpoint(boost::asio::ip::make_address(address), port), c);
-		}
-	}
+	explicit uni_socket(aio& io, boost::asio::ssl::context& ctx)
+		: m_socket(io, ctx)
+	{}
 
-	void async_handshake(ctx c)
-	{
-		if (m_use_ssl)
-		{
-			m_socket_ssl.async_handshake(boost::asio::ssl::stream_base::client, c);
-		}
-	}
+	void async_connect(std::string address, uint16_t port, ctx c);
 
-	void set_use_ssl(bool use_ssl)
-	{
-		m_use_ssl = use_ssl;
-	}
+	void async_handshake(ctx c);
 
 	template<class Buf>
 	void async_read_until(Buf& buf, ctx c)
 	{
-		if (m_use_ssl)
-		{
-			boost::asio::async_read_until(m_socket_ssl, buf, sep, c);
-		}
-		else
-		{
-			boost::asio::async_read_until(m_socket, buf, sep, c);
-		}
+		boost::asio::async_read_until(m_socket, buf, sep, c);
 	}
 
 	template<class Buf, class Transfer>
 	void async_read(Buf& buf, const Transfer& until, ctx c)
 	{
-		if (m_use_ssl)
-		{
-			boost::asio::async_read(m_socket_ssl, buf, until, c);
-		}
-		else
-		{
-			boost::asio::async_read(m_socket, buf, until, c);
-		}
+		boost::asio::async_read(m_socket, buf, until, c);
 	}
 
 	template<class Buf, class Transfer>
 	void async_write(const Buf& buf, const Transfer& until, ctx c)
 	{
-		if (m_use_ssl)
-		{
-			boost::asio::async_write(m_socket_ssl, buf, until, c);
-		}
-		else
-		{
-			boost::asio::async_write(m_socket, buf, until, c);
-		}
+		boost::asio::async_write(m_socket, buf, until, c);
 	}
 
-	void async_shutdown(ctx c)
-	{
-		if (m_use_ssl)
-		{
-			m_socket_ssl.async_shutdown(c);
-		}
-	}
+	void async_shutdown(ctx c);
 
-	void close(boost::system::error_code& ec)
-	{
-		if (m_use_ssl)
-		{
-			m_socket_ssl.lowest_layer().close(ec);
-		}
-		else
-		{
-			m_socket.close(ec);
-		}
-	}
+	void close(boost::system::error_code& ec);
 
-private:
-	boost::asio::ssl::stream<boost::asio::ip::tcp::socket> m_socket_ssl;
-	boost::asio::ip::tcp::socket m_socket;
-	bool m_use_ssl;
+	Socket m_socket;
 };
+
+template<>
+void uni_socket<raw_socket>::close(boost::system::error_code& ec)
+{
+	m_socket.close(ec);
+}
+
+template<>
+void uni_socket<ssl_socket>::close(boost::system::error_code& ec)
+{
+	m_socket.lowest_layer().close(ec);
+}
+
+template<>
+void uni_socket<raw_socket>::async_handshake(ctx /*c*/)
+{
+}
+
+template<>
+void uni_socket<ssl_socket>::async_handshake(ctx c)
+{
+	m_socket.async_handshake(boost::asio::ssl::stream_base::client, c);
+}
+
+
+template<>
+void uni_socket<raw_socket>::async_shutdown(ctx /*c*/)
+{
+}
+
+template<>
+void uni_socket<ssl_socket>::async_shutdown(ctx c)
+{
+	m_socket.async_shutdown(c);
+}
+
+template<>
+void uni_socket<raw_socket>::async_connect(std::string address, uint16_t port, ctx c)
+{
+	m_socket.async_connect(boost::asio::ip::tcp::endpoint(boost::asio::ip::make_address(address), port), c);
+}
+
+template<>
+void uni_socket<ssl_socket>::async_connect(std::string address, uint16_t port, ctx c)
+{
+	m_socket.lowest_layer().async_connect(boost::asio::ip::tcp::endpoint(boost::asio::ip::make_address(address), port), c);
+}
 
 } // namespace nats_asio

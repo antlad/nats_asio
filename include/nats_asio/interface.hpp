@@ -46,7 +46,6 @@ struct connect_config
 	optional<std::string> user;
 	optional<std::string> password;
 	optional<std::string> token;
-	optional<ssl_config> ssl;
 };
 
 struct iconnection
@@ -71,6 +70,6 @@ typedef std::shared_ptr<iconnection> iconnection_sptr;
 typedef std::function<void(iconnection&, ctx)> on_connected_cb;
 typedef std::function<void(iconnection&, ctx)> on_disconnected_cb;
 
-iconnection_sptr create_connection(const logger& log, aio& io, const on_connected_cb& connected_cb, const on_disconnected_cb& disconnected_cb);
+iconnection_sptr create_connection(const logger& log, aio& io, const on_connected_cb& connected_cb, const on_disconnected_cb& disconnected_cb, optional<ssl_config> ssl);
 
 }

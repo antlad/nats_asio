@@ -140,13 +140,13 @@ int main(int argc, char* argv[])
 
 		if (result.count("ssl"))
 		{
-			conf.ssl = nats_asio::ssl_config
-			{
-				read_file(console, ssl_key),
-				read_file(console, ssl_cert),
-				read_file(console, ssl_ca),
-				read_file(console, ssl_dh),
-			};
+			//			conf.ssl = nats_asio::ssl_config
+			//			{
+			//				read_file(console, ssl_key),
+			//				read_file(console, ssl_cert),
+			//				read_file(console, ssl_ca),
+			//				read_file(console, ssl_dh),
+			//			};
 		}
 
 		if (topic.empty())

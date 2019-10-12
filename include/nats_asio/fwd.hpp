@@ -11,8 +11,8 @@ struct options;
 struct subscription;
 typedef std::shared_ptr<subscription> subscription_sptr;
 
-class connection;
-typedef std::shared_ptr<connection> connection_sptr;
+//class connection;
+//typedef std::shared_ptr<connection> connection_sptr;
 
 using boost::optional;
 using boost::string_view;
