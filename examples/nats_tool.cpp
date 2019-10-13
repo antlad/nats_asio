@@ -85,6 +85,7 @@ int main(int argc, char* argv[])
 	{
 		cxxopts::Options options(argv[0], " - filters command line options");
 		nats_asio::connect_config conf;
+		nats_asio::ssl_config ssl_conf;
 		conf.address = "127.0.0.1";
 		conf.port = 4222;
 		std::string username;
@@ -187,7 +188,7 @@ int main(int argc, char* argv[])
 		}
 
 		nats_asio::iconnection_sptr conn;
-		conn = nats_asio::create_connection(console, ioc, [&](nats_asio::iconnection& /*c*/, nats_asio::ctx ctx)
+		conn = nats_asio::create_connection(ioc, console, [&](nats_asio::iconnection& /*c*/, nats_asio::ctx ctx)
 		{
 			console->info("on connected");
 
@@ -204,7 +205,7 @@ int main(int argc, char* argv[])
 		}, [&console](nats_asio::iconnection&, nats_asio::ctx)
 		{
 			console->info("on disconnected");
-		});
+		}, ssl_conf);
 		conn->start(conf);
 
 		if (m == mode::generator)

@@ -21,7 +21,9 @@
 namespace nats_asio {
 
 
-struct subscription: public isubscription
+struct subscription
+	: public isubscription
+	, private boost::asio::detail::noncopyable
 {
 	subscription(uint64_t sid, const on_message_cb& cb)
 		: m_cancel(false)
@@ -47,13 +49,22 @@ struct subscription: public isubscription
 };
 
 template<class SocketType>
-class connection : public iconnection, public parser_observer {
+class connection
+	: public iconnection
+	, public parser_observer
+	, private boost::asio::detail::noncopyable {
 public:
+
 	connection(aio& io,
 			   const logger& log,
 			   const on_connected_cb& connected_cb,
 			   const on_disconnected_cb& disconnected_cb,
-			   uni_socket<SocketType>&& socket);
+			   const std::shared_ptr<ssl::context>& ctx);
+
+	connection(aio& io,
+			   const logger& log,
+			   const on_connected_cb& connected_cb,
+			   const on_disconnected_cb& disconnected_cb);
 
 
 	virtual void start(const connect_config& conf) override;
@@ -107,7 +118,7 @@ private:
 
 	void run(const connect_config& conf, ctx c);
 
-	//	void load_certificates(const ssl_config& conf);
+	void load_certificates(const ssl_config& conf);
 
 	status handle_error(ctx c);
 
@@ -132,40 +143,40 @@ private:
 	boost::system::error_code ec;
 
 	boost::asio::streambuf m_buf;
-	//	boost::asio::ssl::context m_ssl_ctx;
 
+	std::shared_ptr<ssl::context> m_ssl_ctx;
 	uni_socket<SocketType> m_socket;
 };
 
 
-void load_certificates(const ssl_config& conf, boost::asio::ssl::context& ctx)
+void load_certificates(const ssl_config& conf, ssl::context& ctx)
 {
 	ctx.set_options(
-		boost::asio::ssl::context::default_workarounds |
-		boost::asio::ssl::context::no_sslv2 |
-		boost::asio::ssl::context::no_sslv3 |
-		boost::asio::ssl::context::no_tlsv1 |
-		boost::asio::ssl::context::single_dh_use |
-		boost::asio::ssl::context::tls_client
+		ssl::context::default_workarounds |
+		//		ssl::context::no_sslv2 |
+		//		ssl::context::no_sslv3 |
+		//		ssl::context::no_tlsv1 |
+		ssl::context::single_dh_use
+		//		ssl::context::tls_client
 	);
 
 	if (conf.ssl_verify)
 	{
-		ctx.set_verify_mode(boost::asio::ssl::verify_peer);
+		ctx.set_verify_mode(ssl::verify_peer);
 	}
 	else
 	{
-		ctx.set_verify_mode(boost::asio::ssl::verify_none);
+		ctx.set_verify_mode(ssl::verify_none);
 	}
 
 	if (!conf.ssl_cert.empty())
 	{
-		ctx.use_certificate(boost::asio::buffer(conf.ssl_cert.data(), conf.ssl_cert.size()), boost::asio::ssl::context::file_format::pem);
+		ctx.use_certificate(boost::asio::buffer(conf.ssl_cert.data(), conf.ssl_cert.size()), ssl::context::file_format::pem);
 	}
 
 	if (!conf.ssl_ca.empty())
 	{
-		ctx.use_certificate_chain(boost::asio::buffer(conf.ssl_ca.data(), conf.ssl_ca.size()));
+		ctx.add_certificate_authority(boost::asio::buffer(conf.ssl_ca.data(), conf.ssl_ca.size()));
 	}
 
 	if (!conf.ssl_dh.empty())
@@ -175,7 +186,7 @@ void load_certificates(const ssl_config& conf, boost::asio::ssl::context& ctx)
 
 	if (!conf.ssl_key.empty())
 	{
-		ctx.use_private_key(boost::asio::buffer(conf.ssl_key.data(), conf.ssl_key.size()), boost::asio::ssl::context::file_format::pem);
+		ctx.use_private_key(boost::asio::buffer(conf.ssl_key.data(), conf.ssl_key.size()), ssl::context::file_format::pem);
 	}
 }
 
@@ -183,18 +194,18 @@ iconnection_sptr create_connection(aio& io, const logger& log, const on_connecte
 {
 	if (ssl_conf.has_value())
 	{
-		boost::asio::ssl::context ssl_ctx(boost::asio::ssl::context::tls_client);
-		load_certificates(ssl_conf.value(), ssl_ctx);
-		return std::make_shared<connection<ssl_socket>>(io, log, connected_cb, disconnected_cb, uni_socket<ssl_socket>(io));
+		auto ssl_ctx = std::make_shared<ssl::context>(ssl::context::tlsv12_client);
+		load_certificates(ssl_conf.value(), *ssl_ctx);
+		return std::make_shared<connection<ssl_socket>>(io, log, connected_cb, disconnected_cb, ssl_ctx);
 	}
 	else
 	{
-		return std::make_shared<connection<raw_socket>>(io, log, connected_cb, disconnected_cb, uni_socket<raw_socket>(io));
+		return std::make_shared<connection<raw_socket>>(io, log, connected_cb, disconnected_cb);
 	}
 }
 
 template<class SocketType>
-connection<SocketType>::connection(aio& io, const logger& log, const on_connected_cb& connected_cb, const on_disconnected_cb& disconnected_cb, uni_socket<SocketType>&& socket)
+connection<SocketType>::connection(aio& io, const logger& log, const on_connected_cb& connected_cb, const on_disconnected_cb& disconnected_cb, const std::shared_ptr<ssl::context>& ctx)
 	: m_sid(0)
 	, m_max_payload(0)
 	, m_log(log)
@@ -203,18 +214,33 @@ connection<SocketType>::connection(aio& io, const logger& log, const on_connecte
 	, m_stop_flag(false)
 	, m_connected_cb(connected_cb)
 	, m_disconnected_cb(disconnected_cb)
-	, m_socket(std::forward<uni_socket<SocketType>>(socket))
+	, m_ssl_ctx(ctx)
+	, m_socket(io, *ctx.get())
 {
 }
 
-template<class Socket>
-void connection<Socket>::start(const connect_config& conf)
+template<class SocketType>
+connection<SocketType>::connection(aio& io, const logger& log, const on_connected_cb& connected_cb, const on_disconnected_cb& disconnected_cb)
+	: m_sid(0)
+	, m_max_payload(0)
+	, m_log(log)
+	, m_io(io)
+	, m_is_connected(false)
+	, m_stop_flag(false)
+	, m_connected_cb(connected_cb)
+	, m_disconnected_cb(disconnected_cb)
+	, m_socket(io)
+{
+}
+
+template<class SocketType>
+void connection<SocketType>::start(const connect_config& conf)
 {
 	boost::asio::spawn(m_io, std::bind(&connection::run, this, conf, std::placeholders::_1));
 }
 
-template<class Socket>
-status connection<Socket>::publish(boost::string_view subject, const char* raw, std::size_t n, optional<boost::string_view> reply_to, ctx c)
+template<class SocketType>
+status connection<SocketType>::publish(boost::string_view subject, const char* raw, std::size_t n, optional<boost::string_view> reply_to, ctx c)
 {
 	if (!m_is_connected)
 	{
@@ -242,8 +268,8 @@ status connection<Socket>::publish(boost::string_view subject, const char* raw, 
 	return handle_error(c);
 }
 
-template<class Socket>
-status connection<Socket>::unsubscribe(const isubscription_sptr& p, ctx c)
+template<class SocketType>
+status connection<SocketType>::unsubscribe(const isubscription_sptr& p, ctx c)
 {
 	auto it = m_subs.find(p->sid());
 
@@ -260,8 +286,8 @@ status connection<Socket>::unsubscribe(const isubscription_sptr& p, ctx c)
 	return handle_error(c);
 }
 
-template<class Socket>
-std::pair<isubscription_sptr, status> connection<Socket>::subscribe(boost::string_view subject, optional<boost::string_view> queue, on_message_cb cb, ctx c)
+template<class SocketType>
+std::pair<isubscription_sptr, status> connection<SocketType>::subscribe(boost::string_view subject, optional<boost::string_view> queue, on_message_cb cb, ctx c)
 {
 	if (!m_is_connected)
 	{
@@ -296,8 +322,8 @@ std::pair<isubscription_sptr, status> connection<Socket>::subscribe(boost::strin
 	return {sub, {}};
 }
 
-template<class Socket>
-void connection<Socket>::on_ping(ctx c)
+template<class SocketType>
+void connection<SocketType>::on_ping(ctx c)
 {
 	m_log->trace("ping recived");
 	const std::string pong("PONG\r\n");
@@ -307,8 +333,8 @@ void connection<Socket>::on_ping(ctx c)
 	handle_error(c);
 }
 
-template<class Socket>
-void connection<Socket>::on_info(boost::string_view info, ctx c)
+template<class SocketType>
+void connection<SocketType>::on_info(boost::string_view info, ctx c)
 {
 	using nlohmann::json;
 	auto j = json::parse(info);
@@ -317,8 +343,8 @@ void connection<Socket>::on_info(boost::string_view info, ctx c)
 	m_log->trace("info recived and parsed");
 }
 
-template<class Socket>
-void connection<Socket>::on_message(boost::string_view subject, boost::string_view sid_str, optional<boost::string_view> reply_to, std::size_t n, ctx c)
+template<class SocketType>
+void connection<SocketType>::on_message(boost::string_view subject, boost::string_view sid_str, optional<boost::string_view> reply_to, std::size_t n, ctx c)
 {
 	int bytes_to_transsfer = int(n) + 2 - int(m_buf.size());
 
@@ -382,11 +408,22 @@ void connection<Socket>::on_message(boost::string_view subject, boost::string_vi
 	}
 }
 
-template<class Socket>
-status connection<Socket>::do_connect(const connect_config& conf, ctx c)
+template<class SocketType>
+status connection<SocketType>::do_connect(const connect_config& conf, ctx c)
 {
-	m_socket.async_connect(conf.address, conf.port, c[ec]);
+	tcp::resolver res(m_io);
+	auto it = res.async_resolve(tcp::resolver::query(conf.address, std::to_string(conf.port)), c[ec]);
 	auto s = handle_error(c);
+
+	if (s.failed())
+	{
+		m_log->error("async resolve of {}:{} failed with error: {}", conf.address, conf.port, s.error());
+		return s;
+	}
+
+	// TODO: how to get end here?
+	m_socket.async_connect((*it).endpoint(), c[ec]);
+	s = handle_error(c);
 
 	if (s.failed())
 	{
@@ -436,8 +473,8 @@ status connection<Socket>::do_connect(const connect_config& conf, ctx c)
 	return {};
 }
 
-template<class Socket>
-void connection<Socket>::run(const connect_config& conf, ctx c)
+template<class SocketType>
+void connection<SocketType>::run(const connect_config& conf, ctx c)
 {
 	std::string header;
 
@@ -493,8 +530,13 @@ void connection<Socket>::run(const connect_config& conf, ctx c)
 	}
 }
 
-template<class Socket>
-status connection<Socket>::handle_error(ctx c)
+template<class SocketType>
+void connection<SocketType>::load_certificates(const ssl_config& conf)
+{
+}
+
+template<class SocketType>
+status connection<SocketType>::handle_error(ctx c)
 {
 	if (ec.failed())
 	{
@@ -521,8 +563,8 @@ status connection<Socket>::handle_error(ctx c)
 	return {};
 }
 
-template<class Socket>
-std::string connection<Socket>::prepare_info(const connect_config& o)
+template<class SocketType>
+std::string connection<SocketType>::prepare_info(const connect_config& o)
 {
 	constexpr auto connect_payload = "CONNECT {}\r\n";
 	constexpr auto name = "nats_asio";
@@ -538,10 +580,10 @@ std::string connection<Socket>::prepare_info(const connect_config& o)
 		{"version",          version},
 	};
 
-	if (o.ssl.has_value())
-	{
-		j["ssl_required"] = o.ssl->ssl_required;
-	}
+	//	if (o.ssl.has_value())
+	//	{
+	//		j["ssl_required"] = o.ssl->ssl_required;
+	//	}
 
 	if (o.user.has_value())
 	{

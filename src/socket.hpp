@@ -1,5 +1,7 @@
 #pragma once
 
+#include "nats_asio/interface.hpp"
+
 #include <nats_asio/defs.hpp>
 
 #include <boost/asio/buffer.hpp>
@@ -20,15 +22,16 @@ typedef boost::asio::ssl::stream<boost::asio::ip::tcp::socket> ssl_socket;
 template<class Socket>
 struct uni_socket
 {
-	explicit uni_socket(aio& io)
+	uni_socket(aio& io)
 		: m_socket(io)
 	{}
 
-	explicit uni_socket(aio& io, boost::asio::ssl::context& ctx)
+	uni_socket(aio& io, boost::asio::ssl::context& ctx)
 		: m_socket(io, ctx)
-	{}
+	{
+	}
 
-	void async_connect(std::string address, uint16_t port, ctx c);
+	void async_connect(const boost::asio::ip::tcp::endpoint& endpoint, ctx c);
 
 	void async_handshake(ctx c);
 
@@ -93,15 +96,15 @@ void uni_socket<ssl_socket>::async_shutdown(ctx c)
 }
 
 template<>
-void uni_socket<raw_socket>::async_connect(std::string address, uint16_t port, ctx c)
+void uni_socket<raw_socket>::async_connect(const boost::asio::ip::tcp::endpoint& endpoint, ctx c)
 {
-	m_socket.async_connect(boost::asio::ip::tcp::endpoint(boost::asio::ip::make_address(address), port), c);
+	m_socket.async_connect(endpoint, c);
 }
 
 template<>
-void uni_socket<ssl_socket>::async_connect(std::string address, uint16_t port, ctx c)
+void uni_socket<ssl_socket>::async_connect(const boost::asio::ip::tcp::endpoint& endpoint, ctx c)
 {
-	m_socket.lowest_layer().async_connect(boost::asio::ip::tcp::endpoint(boost::asio::ip::make_address(address), port), c);
+	m_socket.lowest_layer().async_connect(endpoint, c);
 }
 
 } // namespace nats_asio
