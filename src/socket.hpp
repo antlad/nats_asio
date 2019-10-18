@@ -20,6 +20,22 @@ typedef boost::asio::ip::tcp::socket raw_socket;
 typedef boost::asio::ssl::stream<boost::asio::ip::tcp::socket> ssl_socket;
 
 template<class Socket>
+auto& take_raw_ref(Socket&);
+
+template<>
+auto& take_raw_ref(ssl_socket& s)
+{
+	return s.next_layer();
+}
+
+template<>
+auto& take_raw_ref(raw_socket& s)
+{
+	return s;
+}
+
+
+template<class Socket>
 struct uni_socket
 {
 	uni_socket(aio& io)
@@ -39,6 +55,12 @@ struct uni_socket
 	void async_read_until(Buf& buf, ctx c)
 	{
 		boost::asio::async_read_until(m_socket, buf, sep, c);
+	}
+
+	template<class Buf>
+	void async_read_until_raw(Buf& buf, ctx c)
+	{
+		boost::asio::async_read_until(take_raw_ref(m_socket), buf, sep, c);
 	}
 
 	template<class Buf, class Transfer>

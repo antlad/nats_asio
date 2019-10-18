@@ -86,6 +86,7 @@ int main(int argc, char* argv[])
 		cxxopts::Options options(argv[0], " - filters command line options");
 		nats_asio::connect_config conf;
 		nats_asio::ssl_config ssl_conf;
+		ssl_conf.ssl_verify = true;
 		conf.address = "127.0.0.1";
 		conf.port = 4222;
 		std::string username;
@@ -95,10 +96,10 @@ int main(int argc, char* argv[])
 		int stats_interval = 1;
 		int publish_interval = -1;
 		bool print_to_stdout = false;
-		std::string ssl_key;
-		std::string ssl_cert;
-		std::string ssl_ca;
-		std::string ssl_dh;
+		std::string ssl_key_file;
+		std::string ssl_cert_file;
+		std::string ssl_ca_file;
+		std::string ssl_dh_file;
 		options.add_options()
 		("h,help", "Print help")
 		("d,debug", "Enable debugging")
@@ -112,10 +113,10 @@ int main(int argc, char* argv[])
 		("publish_interval", "publish interval seconds in ms", cxxopts::value<int>(publish_interval))
 		("print", "print messages to stdout", cxxopts::value<bool>(print_to_stdout))
 		("ssl", "Enable ssl")
-		("ssl_key", "ssl_key", cxxopts::value<std::string>(ssl_key))
-		("ssl_cert", "ssl_cert", cxxopts::value<std::string>(ssl_cert))
-		("ssl_ca", "ssl_ca", cxxopts::value<std::string>(ssl_ca))
-		("ssl_dh", "ssl_dh", cxxopts::value<std::string>(ssl_dh))
+		("ssl_key", "ssl_key", cxxopts::value<std::string>(ssl_key_file))
+		("ssl_cert", "ssl_cert", cxxopts::value<std::string>(ssl_cert_file))
+		("ssl_ca", "ssl_ca", cxxopts::value<std::string>(ssl_ca_file))
+		("ssl_dh", "ssl_dh", cxxopts::value<std::string>(ssl_dh_file))
 		;
 		options.parse_positional({"mode"});
 		auto result = options.parse(argc, argv);
@@ -141,13 +142,10 @@ int main(int argc, char* argv[])
 
 		if (result.count("ssl"))
 		{
-			//			conf.ssl = nats_asio::ssl_config
-			//			{
-			//				read_file(console, ssl_key),
-			//				read_file(console, ssl_cert),
-			//				read_file(console, ssl_ca),
-			//				read_file(console, ssl_dh),
-			//			};
+			ssl_conf.ssl_cert = read_file(console, ssl_cert_file);
+			ssl_conf.ssl_ca = read_file(console, ssl_ca_file);
+			ssl_conf.ssl_key = read_file(console, ssl_key_file);
+			ssl_conf.ssl_dh = read_file(console, ssl_dh_file);
 		}
 
 		if (topic.empty())

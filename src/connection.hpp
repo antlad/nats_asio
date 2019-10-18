@@ -25,28 +25,34 @@ struct subscription
 	: public isubscription
 	, private boost::asio::detail::noncopyable
 {
-	subscription(uint64_t sid, const on_message_cb& cb)
-		: m_cancel(false)
-		, m_cb(cb)
-		, m_sid(sid)
+	subscription(uint64_t sid, const on_message_cb& cb);
 
-	{
-	}
+	virtual void cancel() override;
 
-	virtual void cancel() override
-	{
-		m_cancel = true;
-	}
-
-	virtual uint64_t sid() override
-	{
-		return m_sid;
-	}
+	virtual uint64_t sid() override;
 
 	bool m_cancel;
 	on_message_cb m_cb;
 	uint64_t m_sid;
 };
+
+subscription::subscription(uint64_t sid, const on_message_cb& cb)
+	: m_cancel(false)
+	, m_cb(cb)
+	, m_sid(sid)
+
+{
+}
+
+void subscription::cancel()
+{
+	m_cancel = true;
+}
+
+uint64_t subscription::sid()
+{
+	return m_sid;
+}
 
 template<class SocketType>
 class connection
@@ -89,17 +95,17 @@ public:
 private:
 	virtual void on_ping(ctx c) override;
 
-	virtual void on_pong(ctx c) override
+	virtual void on_pong(ctx) override
 	{
 		m_log->trace("pong recived");
 	}
 
-	virtual void on_ok(ctx c) override
+	virtual void on_ok(ctx) override
 	{
 		m_log->trace("ok recived");
 	}
 
-	virtual void on_error(string_view err, ctx c) override
+	virtual void on_error(string_view err, ctx) override
 	{
 		m_log->error("error message from server {}", err);
 	}
@@ -118,7 +124,7 @@ private:
 
 	void run(const connect_config& conf, ctx c);
 
-	void load_certificates(const ssl_config& conf);
+	//void load_certificates(const ssl_config& conf);
 
 	status handle_error(ctx c);
 
@@ -151,14 +157,7 @@ private:
 
 void load_certificates(const ssl_config& conf, ssl::context& ctx)
 {
-	ctx.set_options(
-		ssl::context::default_workarounds |
-		//		ssl::context::no_sslv2 |
-		//		ssl::context::no_sslv3 |
-		//		ssl::context::no_tlsv1 |
-		ssl::context::single_dh_use
-		//		ssl::context::tls_client
-	);
+	ctx.set_options(ssl::context::tls_client);
 
 	if (conf.ssl_verify)
 	{
@@ -334,7 +333,7 @@ void connection<SocketType>::on_ping(ctx c)
 }
 
 template<class SocketType>
-void connection<SocketType>::on_info(boost::string_view info, ctx c)
+void connection<SocketType>::on_info(boost::string_view info, ctx)
 {
 	using nlohmann::json;
 	auto j = json::parse(info);
@@ -430,16 +429,7 @@ status connection<SocketType>::do_connect(const connect_config& conf, ctx c)
 		return s;
 	}
 
-	m_socket.async_handshake(c[ec]);
-	s = handle_error(c);
-
-	if (s.failed())
-	{
-		m_log->error("async handshake failed {}", s.error());
-		return s;
-	}
-
-	m_socket.async_read_until(m_buf, c[ec]);
+	m_socket.async_read_until_raw(m_buf, c[ec]);
 	s = handle_error(c);
 
 	if (s.failed())
@@ -455,6 +445,15 @@ status connection<SocketType>::do_connect(const connect_config& conf, ctx c)
 	if (s.failed())
 	{
 		m_log->error("process message failed with error: {}", s.error());
+		return s;
+	}
+
+	m_socket.async_handshake(c[ec]);
+	s = handle_error(c);
+
+	if (s.failed())
+	{
+		m_log->error("async handshake failed {}", s.error());
 		return s;
 	}
 
@@ -478,12 +477,6 @@ void connection<SocketType>::run(const connect_config& conf, ctx c)
 {
 	std::string header;
 
-	//		if (conf.ssl.has_value())
-	//		{
-	//			m_socket.set_use_ssl(true);
-	//			load_certificates(conf.ssl.value());
-	//		}
-
 	for (;;)
 	{
 		if (m_stop_flag)
@@ -494,6 +487,7 @@ void connection<SocketType>::run(const connect_config& conf, ctx c)
 
 		if (!m_is_connected)
 		{
+			// TODO: make sleep if failed
 			auto s = do_connect(conf, c);
 
 			if (s.failed())
@@ -530,10 +524,7 @@ void connection<SocketType>::run(const connect_config& conf, ctx c)
 	}
 }
 
-template<class SocketType>
-void connection<SocketType>::load_certificates(const ssl_config& conf)
-{
-}
+
 
 template<class SocketType>
 status connection<SocketType>::handle_error(ctx c)
@@ -573,17 +564,12 @@ std::string connection<SocketType>::prepare_info(const connect_config& o)
 	using nlohmann::json;
 	json j =
 	{
-		{"verbose",      o.verbose},
-		{"pedantic",     o.pedantic},
-		{"name",             name },
-		{"lang",             lang },
-		{"version",          version},
+		{"verbose", o.verbose},
+		{"pedantic", o.pedantic},
+		{"name", name },
+		{"lang", lang },
+		{"version", version},
 	};
-
-	//	if (o.ssl.has_value())
-	//	{
-	//		j["ssl_required"] = o.ssl->ssl_required;
-	//	}
 
 	if (o.user.has_value())
 	{
