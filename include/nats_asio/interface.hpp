@@ -1,10 +1,93 @@
 #pragma once
 
-#include <nats_asio/fwd.hpp>
-#include <nats_asio/common.hpp>
-#include <nats_asio/defs.hpp>
+#include <fmt/format.h>
+#include <spdlog/spdlog.h>
+
+#include <boost/asio/io_context.hpp>
+#include <boost/asio/spawn.hpp>
+#include <boost/asio/ip/tcp.hpp>
+
+#include <boost/optional.hpp>
+#include <boost/utility/string_view.hpp>
+
+#include <stdexcept>
+#include <memory>
+
+namespace boost {
+namespace asio {
+namespace ip {
+
+class address;
+class tcp;
+
+} // namespace ip
+} // namespace asio
+} // namespace boost
+
+template <>
+struct fmt::formatter<boost::string_view>
+{
+    template <typename ParseContext>
+    constexpr auto parse(ParseContext& ctx)
+    {
+        return ctx.begin();
+    }
+
+    template <typename FormatContext>
+    auto format(const boost::string_view& d, FormatContext& ctx)
+    {
+        return format_to(ctx.out(), "{}", d.data());
+    }
+};
 
 namespace nats_asio {
+
+using boost::optional;
+using boost::string_view;
+
+typedef boost::asio::io_context aio;
+typedef std::shared_ptr<spdlog::logger> logger;
+typedef boost::asio::yield_context ctx;
+typedef std::shared_ptr<boost::asio::ip::tcp::socket> socket_sptr;
+
+typedef std::function<void(string_view subject, optional<string_view> reply_to, const char* raw, std::size_t n, ctx c)> on_message_cb;
+
+class status {
+public:
+    status() = default;
+
+    status(const std::string& error);
+
+    template <typename S, typename... Args, typename Char = fmt::char_t<S>>
+    status(const S& format_str, Args && ... args)
+        : status(fmt::format(format_str, std::forward<Args>(args)...))
+    {
+    }
+
+    virtual ~status() = default;
+
+    bool failed() const;
+
+    std::string error() const;
+private:
+    optional<std::string> m_error;
+};
+
+
+
+
+bool status::failed() const
+{
+    return m_error.has_value();
+}
+
+std::string status::error() const
+{
+    if (!m_error.has_value())
+        return {};
+
+    return m_error.value();
+}
 
 
 struct isubscription
@@ -15,15 +98,7 @@ struct isubscription
 
 	virtual void cancel() = 0;
 };
-
-
-struct iconnection;
-
 typedef std::shared_ptr<isubscription> isubscription_sptr;
-
-typedef std::function<void(iconnection* conn, ctx c)> on_connected;
-typedef std::function<void(iconnection* conn, ctx c)> on_disconnected;
-
 
 struct ssl_config
 {

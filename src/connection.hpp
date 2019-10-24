@@ -1,15 +1,12 @@
 #include "parser.hpp"
 #include "socket.hpp"
 
-#include <nats_asio/fwd.hpp>
-#include <nats_asio/defs.hpp>
-#include <nats_asio/common.hpp>
 #include <nats_asio/interface.hpp>
-#include <boost/asio/ip/tcp.hpp>
+
+//#include <boost/asio/ip/tcp.hpp>
 #include <boost/asio/buffer.hpp>
 #include <boost/asio/read_until.hpp>
 #include <boost/asio/read.hpp>
-
 #include <boost/asio/streambuf.hpp>
 
 #include "json.hpp"
@@ -35,12 +32,12 @@ struct subscription
 	on_message_cb m_cb;
 	uint64_t m_sid;
 };
+typedef std::shared_ptr<subscription> subscription_sptr;
 
 subscription::subscription(uint64_t sid, const on_message_cb& cb)
 	: m_cancel(false)
 	, m_cb(cb)
 	, m_sid(sid)
-
 {
 }
 
@@ -123,8 +120,6 @@ private:
 	status do_connect(const connect_config& conf, ctx c);
 
 	void run(const connect_config& conf, ctx c);
-
-	//void load_certificates(const ssl_config& conf);
 
 	status handle_error(ctx c);
 
@@ -531,8 +526,6 @@ status connection<SocketType>::handle_error(ctx c)
 {
 	if (ec.failed())
 	{
-		//		if ((ec == boost::asio::error::eof) || (boost::asio::error::connection_reset == ec))
-		//		{
 		auto original_msg = ec.message();
 		m_is_connected = false;
 		m_socket.close(ec); // TODO: handle it if error
@@ -547,7 +540,6 @@ status connection<SocketType>::handle_error(ctx c)
 			m_disconnected_cb(*this, std::move(c));
 		}
 
-		//		}
 		return status(original_msg);
 	}
 

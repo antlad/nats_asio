@@ -2,8 +2,10 @@
 
 #include "nats_asio/interface.hpp"
 
-#include <nats_asio/defs.hpp>
-
+#include <boost/asio/ssl/context.hpp>
+#include <boost/asio/ssl/stream.hpp>
+#include <boost/asio/buffer.hpp>
+#include <boost/asio/ssl/context.hpp>
 #include <boost/asio/buffer.hpp>
 #include <boost/asio/ip/tcp.hpp>
 #include <boost/asio/read.hpp>

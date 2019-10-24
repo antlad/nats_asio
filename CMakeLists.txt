@@ -38,16 +38,12 @@ include_directories(
 set(LINCLUDE "${CMAKE_CURRENT_LIST_DIR}/include/nats_asio" )
 
 set(nats_asio_PUB_INCLUDES
-	"${LINCLUDE}/defs.hpp"
-	"${LINCLUDE}/common.hpp"
-	"${LINCLUDE}/fwd.hpp"
-	"${LINCLUDE}/interface.hpp"
+        "${LINCLUDE}/interface.hpp"
 	)
 
 set(nats_asio_SRCS
 	"src/connection.hpp"
 	"src/parser.hpp"
-	"src/common.cpp"
 	"src/connection.cpp"
 	"src/parser.cpp"
 	"src/socket.hpp"

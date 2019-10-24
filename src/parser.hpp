@@ -1,9 +1,6 @@
 #pragma once
 
-#include <nats_asio/common.hpp>
-#include <nats_asio/defs.hpp>
-
-#include <string_view>
+#include <nats_asio/interface.hpp>
 
 namespace nats_asio {
 
