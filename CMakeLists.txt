@@ -50,6 +50,7 @@ set(nats_asio_SRCS
 	"src/common.cpp"
 	"src/connection.cpp"
 	"src/parser.cpp"
+	"src/socket.hpp"
 )
 
 

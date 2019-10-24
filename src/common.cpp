@@ -3,21 +3,21 @@
 namespace nats_asio {
 
 status::status(const std::string& error)
-    : m_error(error)
+	: m_error(error)
 {
 }
 
 bool status::failed() const
 {
-    return m_error.has_value();
+	return m_error.has_value();
 }
 
 std::string status::error() const
 {
-    if (!m_error.has_value())
-        return {};
+	if (!m_error.has_value())
+		return {};
 
-    return m_error.value();
+	return m_error.value();
 }
 
 }
