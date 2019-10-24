@@ -15,17 +15,6 @@
 #include <stdexcept>
 #include <memory>
 
-namespace boost {
-namespace asio {
-namespace ip {
-
-class address;
-class tcp;
-
-} // namespace ip
-} // namespace asio
-} // namespace boost
-
 template <>
 struct fmt::formatter<boost::string_view>
 {
