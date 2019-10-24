@@ -7,6 +7,8 @@
 #include <boost/asio/spawn.hpp>
 #include <boost/asio/ip/tcp.hpp>
 
+#include <boost/concept/detail/general.hpp>
+#include <boost/concept/detail/general.hpp>
 #include <boost/optional.hpp>
 #include <boost/utility/string_view.hpp>
 
@@ -65,29 +67,21 @@ public:
 
     virtual ~status() = default;
 
-    bool failed() const;
+    bool failed() const
+    {
+        return m_error.has_value();
+    }
 
-    std::string error() const;
+    std::string error() const
+    {
+        if (!m_error.has_value())
+            return {};
+
+        return m_error.value();
+    }
 private:
     optional<std::string> m_error;
 };
-
-
-
-
-bool status::failed() const
-{
-    return m_error.has_value();
-}
-
-std::string status::error() const
-{
-    if (!m_error.has_value())
-        return {};
-
-    return m_error.value();
-}
-
 
 struct isubscription
 {
