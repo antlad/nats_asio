@@ -1,0 +1,12 @@
+[requires]
+boost/1.71.0@conan/stable
+fmt/6.0.0@bincrafters/stable
+spdlog/1.4.2@bincrafters/stable
+gtest/1.8.1@bincrafters/stable
+cxxopts/v2.1.2@inexorgame/stable
+OpenSSL/1.1.1c@conan/stable
+jsonformoderncpp/3.7.2@vthiery/stable
+
+[generators]
+cmake
+
