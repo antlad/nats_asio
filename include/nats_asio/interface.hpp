@@ -37,7 +37,6 @@ Copyright (c) 2019 Vladislav Troinich
 #include <boost/optional.hpp>
 #include <boost/utility/string_view.hpp>
 
-
 #include <stdexcept>
 #include <memory>
 

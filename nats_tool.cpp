@@ -1,4 +1,3 @@
-
 #include <nats_asio/interface.hpp>
 
 #include <spdlog/spdlog.h>
