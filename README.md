@@ -13,10 +13,11 @@ This is [nats-io](https://nats.io/) client writen in c++14 with use of [boost](h
 - cxxopts@v2.2.0 (ENABLE_EXAMPLES off by default)
 
 ## Build 
+# you can manually start conan install in build folder. But if you try to open project under something like QtCreator that is trying cmake in temp folder add -DENABLE_CONAN_QTCREATOR_SUPPORT=ON flag to cmake
 ```bash
 mkdir build
 cd build
-cmake .. -DCMAKE_PREFIX_PATH=${PREFIX} -DCMAKE_INSTALL_PREFIX=${PREFIX} ${CMAKE_ARGS}
+cmake .. -DCMAKE_PREFIX_PATH=${PREFIX}  -DCMAKE_INSTALL_PREFIX=${PREFIX} ${CMAKE_ARGS}
 cmake --build .
 cmake --build . --target install
 ```
