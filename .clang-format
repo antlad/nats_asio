@@ -1,0 +1,8 @@
+AccessModifierOffset: '-4'
+ConstructorInitializerIndentWidth: '4'
+ContinuationIndentWidth: '4'
+IndentWidth: '4'
+PointerAlignment: Left
+ColumnLimit: 120
+TabWidth: '4'
+UseTab: Never

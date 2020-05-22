@@ -41,3 +41,6 @@ Testing/*
 cmake-build-debug-gcc8
 build/CMakeCache.txt
 build_debug/*
+.cmake
+cmake-*
+.idea/
