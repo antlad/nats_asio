@@ -45,7 +45,7 @@ if (USE_CONAN)
     endif ()
 endif()
 
-find_package(Boost COMPONENTS coroutine REQUIRED)
+find_package(Boost REQUIRED)
 find_package(spdlog REQUIRED)
 find_package(OpenSSL REQUIRED)
 
