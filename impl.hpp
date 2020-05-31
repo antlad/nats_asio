@@ -44,6 +44,14 @@ Software is furnished to do so, subject to the following conditions:
 #include <utility>
 #include <vector>
 
+template <> struct fmt::formatter<nats_asio::string_view> {
+    template <typename ParseContext> constexpr auto parse(ParseContext& ctx) { return ctx.begin(); }
+
+    template <typename FormatContext> auto format(const nats_asio::string_view& d, FormatContext& ctx) {
+        return format_to(ctx.out(), "{}", d.data());
+    }
+};
+
 namespace nats_asio {
 
 using boost::asio::ip::tcp;
@@ -216,7 +224,7 @@ status parse_header(std::string& header, std::istream& is, parser_observer* obse
         try {
             bytes_n = static_cast<std::size_t>(std::stoll(results[bytes_id].data(), nullptr, 10));
         } catch (const std::exception& e) {
-            return {"can't parse int in headers: {}", e.what()};
+            return {fmt::format("can't parse int in headers: {}", e.what())};
         }
 
         if (replty_to) {
@@ -430,7 +438,7 @@ template <class SocketType> status connection<SocketType>::unsubscribe(const isu
     auto it = m_subs.find(p->sid());
 
     if (it == m_subs.end()) {
-        return status("subscription not found {}", p->sid());
+        return status(fmt::format("subscription not found {}", p->sid()));
     }
 
     m_subs.erase(it);

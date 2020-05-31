@@ -1,6 +1,6 @@
 [requires]
 boost/1.71.0@conan/stable
-fmt/6.1.2
+fmt/6.2.0
 spdlog/1.5.0
 gtest/1.8.1@bincrafters/stable
 cxxopts/v2.1.2@inexorgame/stable
