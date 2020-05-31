@@ -1,17 +1,34 @@
 # nats-asio
 
 ## Overview
-This is [nats-io](https://nats.io/) client writen in c++14 with use of [boost](https://www.boost.org/) [asio](https://www.boost.org/doc/libs/release/libs/asio/) and corutines libraries.
+This is [nats-io](https://nats.io/) client writen in c++14 with use of [boost](https://www.boost.org/) [asio](https://www.boost.org/doc/libs/release/libs/asio/) and coroutines libraries.
 
 ## Requirements
-
-## Build 
-You can manually start conan install in build folder (`conan install --build=missing ..`). But if you try to open project under something like QtCreator that is trying cmake in temp folder add -DENABLE_CONAN_QTCREATOR_SUPPORT=ON flag to cmake
-```bash
-./config_conan.sh
-mkdir build
-cd build
-cmake .. -DCMAKE_PREFIX_PATH=${PREFIX}  -DCMAKE_INSTALL_PREFIX=${PREFIX} ${CMAKE_ARGS}
-cmake --build .
-cmake --build . --target install
+For Library
 ```
+boost/1.71.0@conan/stable
+fmt/6.1.2
+spdlog/1.5.0
+OpenSSL/1.1.1c@conan/stable
+jsonformoderncpp/3.7.2@vthiery/stable
+```
+
+For tests 
+```
+gtest/1.8.1@bincrafters/stable
+```
+For nats tool 
+```
+cxxopts/v2.1.2@inexorgame/stable
+```
+
+## Usage of library
+ - You can just copy `interface.hpp` and `impl.hpp` in you project (don't forget to include `impl.hpp` somewhere)
+ - Or you can use with conan package. Add conan remote:
+```bash
+conan remote add antlad-conan https://api.bintray.com/conan/antlad/antlad-conan
+```
+And then add `nats_asio/0.0.9@_/_` to dependencies
+
+## Example
+Please check source code of tool `samples/nats_tool.cpp`
