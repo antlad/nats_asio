@@ -28,7 +28,9 @@ cxxopts/v2.1.2@inexorgame/stable
 ```bash
 conan remote add antlad-conan https://api.bintray.com/conan/antlad/antlad-conan
 ```
-And then add `nats_asio/0.0.9@_/_` to dependencies
+And then add `nats_asio/0.0.10@_/_` to dependencies. 
+
+If you use 17 standard, don't forget to specify it in conan profile or during install, more details [here]( https://docs.conan.io/en/1.7/howtos/manage_cpp_standard.html)
 
 ## Example
 Please check source code of tool `samples/nats_tool.cpp`
