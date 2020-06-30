@@ -9,6 +9,7 @@
 #include <fstream>
 #include <iostream>
 #include <tuple>
+#include <boost/optional.hpp>
 
 const std::string grub_mode("grub");
 const std::string gen_mode("gen");
@@ -130,11 +131,15 @@ int main(int argc, char* argv[]) {
             return 1;
         }
 
+        boost::optional<nats_asio::ssl_config> opt_ssl_conf;
         if (result.count("ssl")) {
             ssl_conf.ssl_cert = read_file(console, ssl_cert_file);
             ssl_conf.ssl_ca = read_file(console, ssl_ca_file);
             ssl_conf.ssl_key = read_file(console, ssl_key_file);
             ssl_conf.ssl_dh = read_file(console, ssl_dh_file);
+            opt_ssl_conf = ssl_conf;
+        } else {
+            opt_ssl_conf = boost::none;
         }
 
         if (topic.empty()) {
@@ -183,7 +188,9 @@ int main(int argc, char* argv[]) {
                     }
                 }
             },
-            [&console](nats_asio::iconnection&, nats_asio::ctx) { console->info("on disconnected"); }, ssl_conf);
+            [&console](nats_asio::iconnection&, nats_asio::ctx) { console->info("on disconnected"); }
+            , opt_ssl_conf
+            );
         conn->start(conf);
 
         if (m == mode::generator) {
