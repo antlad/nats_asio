@@ -435,14 +435,15 @@ status connection<SocketType>::publish(string_view subject, const char* raw, std
 }
 
 template <class SocketType> status connection<SocketType>::unsubscribe(const isubscription_sptr& p, ctx c) {
-    auto it = m_subs.find(p->sid());
+    auto sid = p->sid();
+    auto it = m_subs.find(sid);
 
     if (it == m_subs.end()) {
-        return status(fmt::format("subscription not found {}", p->sid()));
+        return status(fmt::format("subscription not found {}", sid));
     }
-
     m_subs.erase(it);
-    const std::string unsub_payload("UNSUB {}\r\n");
+    
+    std::string unsub_payload(fmt::format("UNSUB {}\r\n", sid));
     m_socket.async_write(boost::asio::buffer(unsub_payload), boost::asio::transfer_exactly(unsub_payload.size()),
                          c[ec]);
     return handle_error(c);
