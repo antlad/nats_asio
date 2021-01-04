@@ -46,7 +46,7 @@ if (ENABLE_TESTS)
     find_package(GTest REQUIRED)
     include_directories(${GTEST_INCLUDE_DIRS})
     add_executable(parser_test tests/check1.cpp)
-    target_link_libraries(parser_test ${CONAN_LIBS})
+    target_link_libraries(parser_test GTest::GTest GTest::Main ${CONAN_LIBS})
     add_test(DefaultTestSuite default_test_suite)
 endif ()
 

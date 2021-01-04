@@ -1,11 +1,11 @@
 [requires]
-boost/1.71.0@conan/stable
+boost/1.74.0
 fmt/6.2.0
 spdlog/1.5.0
-gtest/1.8.1@bincrafters/stable
-cxxopts/v2.1.2@inexorgame/stable
-OpenSSL/1.1.1c@conan/stable
-jsonformoderncpp/3.7.2@vthiery/stable
+gtest/1.8.1
+cxxopts/2.2.1
+openssl/1.1.1d
+nlohmann_json/3.9.1
 
 [generators]
 cmake
