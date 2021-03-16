@@ -429,7 +429,7 @@ status connection<SocketType>::publish(string_view subject, const char* raw, std
     buffers.emplace_back(boost::asio::buffer(header.data(), header.size()));
     buffers.emplace_back(boost::asio::buffer(raw, n));
     buffers.emplace_back(boost::asio::buffer("\r\n", 2));
-    std::size_t total_size = header.size() + n + 4;
+    std::size_t total_size = header.size() + n + 2;
     m_socket.async_write(buffers, boost::asio::transfer_exactly(total_size), c[ec]);
     return handle_error(c);
 }
@@ -442,7 +442,7 @@ template <class SocketType> status connection<SocketType>::unsubscribe(const isu
         return status(fmt::format("subscription not found {}", sid));
     }
     m_subs.erase(it);
-    
+
     std::string unsub_payload(fmt::format("UNSUB {}\r\n", sid));
     m_socket.async_write(boost::asio::buffer(unsub_payload), boost::asio::transfer_exactly(unsub_payload.size()),
                          c[ec]);
