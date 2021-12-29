@@ -1,12 +1,29 @@
 [requires]
-boost/1.74.0
-fmt/6.2.0
-spdlog/1.5.0
-gtest/1.8.1
+boost/1.77.0
+spdlog/1.8.1
+gtest/1.11.0
 cxxopts/2.2.1
-openssl/1.1.1d
 nlohmann_json/3.9.1
+openssl/1.1.1l
 
 [generators]
 cmake
 
+[options]
+openssl:shared=False
+openssl:fPIC=True
+boost:fPIC=True
+boost:shared=False
+boost:without_locale=True
+boost:without_python=True
+boost:without_log=True
+boost:without_mpi=True
+boost:without_graph_parallel=True
+boost:without_fiber=True
+boost:without_graph=True
+boost:without_program_options=True
+boost:without_test=True
+boost:with_stacktrace_backtrace=False
+boost:without_stacktrace=True
+spdlog:shared=False
+spdlog:header_only=True
