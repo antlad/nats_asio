@@ -178,7 +178,10 @@ int main(int argc, char* argv[]) {
             [&](nats_asio::iconnection& /*c*/, nats_asio::ctx ctx) {
                 console->info("on connected");
 
-                if (m == mode::grubber) {
+
+                switch(m)
+                {
+                case mode::grubber:{
                     using namespace std::placeholders;
                     auto r = conn->subscribe(topic, {},
                                              std::bind(&grubber::on_message, grub_ptr.get(), _1, _2, _3, _4, _5), ctx);
@@ -186,6 +189,12 @@ int main(int argc, char* argv[]) {
                     if (r.second.failed()) {
                         console->error("failed to subscribe with error: {}", r.second.error());
                     }
+                    break ;
+                }
+                case mode::generator:{
+                    boost::asio::spawn(ioc, std::bind(&generator::publish, gen_ptr.get(), std::placeholders::_1));
+                    break ;
+                }
                 }
             },
             [&console](nats_asio::iconnection&, nats_asio::ctx) { console->info("on disconnected"); }
@@ -232,26 +241,20 @@ generator::generator(boost::asio::io_context& ioc, std::shared_ptr<spdlog::logge
                      const nats_asio::iconnection_sptr& conn, const std::string& topic, int stats_interval,
                      int publish_interval_ms)
     : worker(ioc, console, stats_interval), m_publish_interval_ms(publish_interval_ms), m_topic(topic), m_conn(conn) {
-    if (m_publish_interval_ms >= 0) {
-        boost::asio::spawn(ioc, std::bind(&generator::publish, this, std::placeholders::_1));
-    }
+
 }
 void generator::publish(boost::asio::yield_context ctx) {
-    boost::asio::deadline_timer timer(m_ioc);
     boost::system::error_code error;
-    const std::string msg("{\"value\": 123}");
 
-    for (;;) {
-        auto s = m_conn->publish(m_topic, msg.data(), msg.size(), {}, ctx);
+    for (int i = 0; i < 10; i++) {
+        auto msg = fmt::format("{{\"value\": {} }}", i);
+        auto s = m_conn->publish(m_topic, msg.c_str(), msg.size(), {}, ctx);
 
         if (s.failed()) {
             m_log->error("publish failed with error {}", s.error());
         } else {
             m_counter++;
         }
-
-        timer.expires_from_now(boost::posix_time::milliseconds(1 * m_publish_interval_ms));
-        timer.async_wait(ctx[error]);
 
         if (error.failed()) {
             return;
