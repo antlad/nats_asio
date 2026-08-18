@@ -6,7 +6,7 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-option(ENABLE_TESTS "enable tests" OFF)
+option(ENABLE_TESTS "enable tests" ON)
 option(BUILD_NATS_TOOL "build nats tool" ON)
 
 add_definitions(-DSPDLOG_FMT_EXTERNAL)
@@ -63,8 +63,15 @@ if (ENABLE_TESTS)
     find_package(GTest REQUIRED)
     include_directories(${GTEST_INCLUDE_DIRS})
     add_executable(parser_test tests/check1.cpp)
-    target_link_libraries(parser_test GTest::GTest GTest::Main)
-    add_test(DefaultTestSuite default_test_suite)
+    target_link_libraries(parser_test
+        GTest::gmock_main
+        boost::boost
+        spdlog::spdlog_header_only
+        fmt::fmt
+        nlohmann_json::nlohmann_json
+        openssl::openssl
+    )
+    add_test(NAME parser_test COMMAND parser_test)
 endif ()
 
 
