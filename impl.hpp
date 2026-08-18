@@ -406,7 +406,7 @@ connection<SocketType>::connection(aio& io, const logger& log, const on_connecte
       m_connected_cb(connected_cb), m_disconnected_cb(disconnected_cb), m_socket(io) {}
 
 template <class SocketType> void connection<SocketType>::start(const connect_config& conf) {
-    boost::asio::spawn(m_io, std::bind(&connection::run, this, conf, std::placeholders::_1));
+    boost::asio::spawn(m_io, std::bind(&connection::run, this, conf, std::placeholders::_1), boost::asio::detached);
 }
 
 template <class SocketType>
@@ -545,8 +545,10 @@ void connection<SocketType>::on_message(string_view subject, string_view sid_str
 
 template <class SocketType> status connection<SocketType>::do_connect(const connect_config& conf, ctx c) {
     tcp::resolver res(m_io);
-    auto it = res.async_resolve(tcp::resolver::query(conf.address, std::to_string(conf.port)), c[ec]);
+    
+    auto endpoints = res.async_resolve(conf.address, std::to_string(conf.port), c[ec]);
     auto s = handle_error(c);
+    
 
     if (s.failed()) {
         m_log->error("async resolve of {}:{} failed with error: {}", conf.address, conf.port, s.error());
@@ -554,7 +556,7 @@ template <class SocketType> status connection<SocketType>::do_connect(const conn
     }
 
     // TODO: how to get end here?
-    m_socket.async_connect((*it).endpoint(), c[ec]);
+    m_socket.async_connect(endpoints.begin()->endpoint(), c[ec]);
     s = handle_error(c);
 
     if (s.failed()) {

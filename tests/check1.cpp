@@ -20,7 +20,7 @@ struct parser_mock : public parser_observer {
 
 void async_process(const std::function<void(ctx c)>& f) {
     boost::asio::io_context ioc;
-    boost::asio::spawn(ioc, std::bind(f, std::placeholders::_1));
+    boost::asio::spawn(ioc, std::bind(f, std::placeholders::_1), boost::asio::detached);
     ioc.run();
 }
 
