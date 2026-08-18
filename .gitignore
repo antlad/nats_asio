@@ -32,6 +32,7 @@
 *.app
 
 build/*
+.vscode/
 .vscode/tasks.json
 .vscode/settings.json
 .vscode/launch.json
@@ -48,3 +49,7 @@ CMakeUserPresets.json
 compile_commands.json
 .cache
 CMakePresets.json
+__pycache__/
+.pytest_cache/
+.venv/
+.task/

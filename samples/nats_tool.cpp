@@ -50,7 +50,7 @@ public:
             bool print_to_stdout);
 
     void on_message(nats_asio::string_view, nats_asio::optional<nats_asio::string_view>, const char* raw,
-                    std::size_t /*n*/, nats_asio::ctx);
+                    std::size_t n, nats_asio::ctx);
 
 private:
     bool m_print_to_stdout;
@@ -260,11 +260,12 @@ void generator::publish(boost::asio::yield_context ctx) {
 grubber::grubber(boost::asio::io_context& ioc, std::shared_ptr<spdlog::logger>& console, int stats_interval,
                  bool print_to_stdout)
     : worker(ioc, console, stats_interval), m_print_to_stdout(print_to_stdout) {}
-void grubber::on_message(nats_asio::string_view, nats_asio::optional<nats_asio::string_view>, const char* raw, std::size_t,
-                         nats_asio::ctx) {
+void grubber::on_message(nats_asio::string_view, nats_asio::optional<nats_asio::string_view>, const char* raw,
+                         std::size_t n, nats_asio::ctx) {
     m_counter++;
 
     if (m_print_to_stdout) {
-        std::cout << raw << std::endl;
+        std::cout.write(raw, static_cast<std::streamsize>(n));
+        std::cout << std::endl;
     }
 }
