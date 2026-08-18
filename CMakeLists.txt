@@ -6,7 +6,7 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-option(ENABLE_TESTS "enable tests" ON)
+option(ENABLE_TESTS "enable tests" OFF)
 option(BUILD_NATS_TOOL "build nats tool" ON)
 
 add_definitions(-DSPDLOG_FMT_EXTERNAL)
