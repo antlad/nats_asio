@@ -28,6 +28,7 @@ Software is furnished to do so, subject to the following conditions:
 #include <spdlog/spdlog.h>
 
 #include <boost/asio/deadline_timer.hpp>
+#include <boost/asio/detached.hpp>
 #include <boost/asio/io_context.hpp>
 #include <boost/asio/ip/tcp.hpp>
 #include <boost/asio/spawn.hpp>

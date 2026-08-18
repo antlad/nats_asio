@@ -1,0 +1,72 @@
+name: CI
+
+on:
+  push:
+    branches: [master, renovation]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  BUILD_TYPE: Release
+
+jobs:
+  build-and-test:
+    name: build, unit tests, integration tests
+    runs-on: ubuntu-24.04
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Conan
+        run: pip install 'conan>=2.0,<3'
+
+      - name: Detect Conan profile
+        run: conan profile detect --force
+
+      # Boost is built from source when ConanCenter has no matching binary,
+      # so the package cache is worth keeping between runs.
+      - name: Cache Conan packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.conan2
+          key: conan-${{ runner.os }}-${{ hashFiles('conanfile.txt') }}
+          restore-keys: conan-${{ runner.os }}-
+
+      - name: Install dependencies
+        run: conan install . -b missing -s build_type=${{ env.BUILD_TYPE }}
+
+      - name: Configure
+        run: cmake --preset conan-release -DENABLE_TESTS=ON -DBUILD_NATS_TOOL=ON
+
+      - name: Build
+        run: cmake --build build/${{ env.BUILD_TYPE }} -j"$(nproc)"
+
+      - name: Unit tests
+        run: ctest --test-dir build/${{ env.BUILD_TYPE }} --output-on-failure
+
+      - name: Install integration test dependencies
+        run: pip install -r tests/integration/requirements.txt
+
+      # testcontainers talks to the Docker daemon preinstalled on the runner.
+      - name: Integration tests
+        env:
+          NATS_TOOL_BIN: ${{ github.workspace }}/build/${{ env.BUILD_TYPE }}/nats_tool
+        run: pytest tests/integration -v
+
+      - name: Upload diagnostics on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-diagnostics
+          path: |
+            build/**/CMakeFiles/CMakeConfigureLog.yaml
+            build/**/Testing/**
+          if-no-files-found: ignore

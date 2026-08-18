@@ -9,7 +9,6 @@
 #include <fstream>
 #include <iostream>
 #include <tuple>
-#include <boost/optional.hpp>
 
 const std::string grub_mode("grub");
 const std::string gen_mode("gen");
@@ -51,7 +50,7 @@ public:
             bool print_to_stdout);
 
     void on_message(nats_asio::string_view, nats_asio::optional<nats_asio::string_view>, const char* raw,
-                    std::size_t /*n*/, nats_asio::ctx);
+                    std::size_t n, nats_asio::ctx);
 
 private:
     bool m_print_to_stdout;
@@ -131,7 +130,7 @@ int main(int argc, char* argv[]) {
             return 1;
         }
 
-        boost::optional<nats_asio::ssl_config> opt_ssl_conf;
+        nats_asio::optional<nats_asio::ssl_config> opt_ssl_conf;
         if (result.count("ssl")) {
             ssl_conf.ssl_cert = read_file(console, ssl_cert_file);
             ssl_conf.ssl_ca = read_file(console, ssl_ca_file);
@@ -139,7 +138,7 @@ int main(int argc, char* argv[]) {
             ssl_conf.ssl_dh = read_file(console, ssl_dh_file);
             opt_ssl_conf = ssl_conf;
         } else {
-            opt_ssl_conf = boost::none;
+            opt_ssl_conf = {};
         }
 
         if (topic.empty()) {
@@ -211,7 +210,7 @@ int main(int argc, char* argv[]) {
 
 worker::worker(boost::asio::io_context& ioc, std::shared_ptr<spdlog::logger>& console, int stats_interval)
     : m_stats_interval(stats_interval), m_counter(0), m_ioc(ioc), m_log(console) {
-    boost::asio::spawn(ioc, std::bind(&worker::stats_timer, this, std::placeholders::_1));
+    boost::asio::spawn(ioc, std::bind(&worker::stats_timer, this, std::placeholders::_1), boost::asio::detached);
 }
 void worker::stats_timer(boost::asio::yield_context ctx) {
     boost::asio::deadline_timer timer(m_ioc);
@@ -233,7 +232,7 @@ generator::generator(boost::asio::io_context& ioc, std::shared_ptr<spdlog::logge
                      int publish_interval_ms)
     : worker(ioc, console, stats_interval), m_publish_interval_ms(publish_interval_ms), m_topic(topic), m_conn(conn) {
     if (m_publish_interval_ms >= 0) {
-        boost::asio::spawn(ioc, std::bind(&generator::publish, this, std::placeholders::_1));
+        boost::asio::spawn(ioc, std::bind(&generator::publish, this, std::placeholders::_1), boost::asio::detached);
     }
 }
 void generator::publish(boost::asio::yield_context ctx) {
@@ -261,11 +260,12 @@ void generator::publish(boost::asio::yield_context ctx) {
 grubber::grubber(boost::asio::io_context& ioc, std::shared_ptr<spdlog::logger>& console, int stats_interval,
                  bool print_to_stdout)
     : worker(ioc, console, stats_interval), m_print_to_stdout(print_to_stdout) {}
-void grubber::on_message(boost::string_view, nats_asio::optional<boost::string_view>, const char* raw, std::size_t,
-                         nats_asio::ctx) {
+void grubber::on_message(nats_asio::string_view, nats_asio::optional<nats_asio::string_view>, const char* raw,
+                         std::size_t n, nats_asio::ctx) {
     m_counter++;
 
     if (m_print_to_stdout) {
-        std::cout << raw << std::endl;
+        std::cout.write(raw, static_cast<std::streamsize>(n));
+        std::cout << std::endl;
     }
 }

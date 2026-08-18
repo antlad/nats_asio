@@ -1,0 +1,65 @@
+version: '3'
+
+vars:
+  BUILD_ROOT: build
+  BUILD_DIR: build/Release
+  VENV: .venv
+  JOBS:
+    sh: getconf _NPROCESSORS_ONLN
+
+tasks:
+  default:
+    desc: List available tasks
+    cmd: task --list
+    silent: true
+
+  deps:
+    desc: Wipe generated files and regenerate Conan dependencies (extra args go to `conan install`)
+    cmds:
+      # Everything below is generated; a stale CMakeUserPresets.json or compile
+      # database silently outlives a dependency change, so start from nothing.
+      - rm -rf {{.BUILD_ROOT}} CMakeUserPresets.json compile_commands.json .cache
+      - conan install . -b missing {{.CLI_ARGS}}
+      - cmd: 'printf "\nDone. In VSCode: CMake: Select Configure Preset -> conan-release, then Configure.\n"'
+        silent: true
+
+  configure:
+    desc: Configure CMake from the conan-release preset, with tests and nats_tool enabled
+    run: once
+    cmd: cmake --preset conan-release -DENABLE_TESTS=ON -DBUILD_NATS_TOOL=ON
+
+  build:
+    desc: Build the library, nats_tool and the unit tests
+    run: once
+    deps: [configure]
+    cmd: cmake --build {{.BUILD_DIR}} -j{{.JOBS}}
+
+  test:
+    desc: Run the unit tests (ctest)
+    deps: [build]
+    cmd: ctest --test-dir {{.BUILD_DIR}} --output-on-failure {{.CLI_ARGS}}
+
+  venv:
+    desc: Create the Python virtualenv used by the integration tests
+    run: once
+    cmds:
+      - python3 -m venv {{.VENV}}
+      - '{{.VENV}}/bin/pip install --quiet --upgrade pip'
+      - '{{.VENV}}/bin/pip install --quiet -r tests/integration/requirements.txt'
+    sources:
+      - tests/integration/requirements.txt
+    generates:
+      - '{{.VENV}}/bin/pytest'
+
+  integration-test:
+    desc: Run the integration tests against a containerised nats-server (needs Docker)
+    deps: [build, venv]
+    env:
+      NATS_TOOL_BIN: '{{.ROOT_DIR}}/{{.BUILD_DIR}}/nats_tool'
+    cmd: '{{.VENV}}/bin/pytest tests/integration -v {{.CLI_ARGS}}'
+
+  test-all:
+    desc: Run unit tests and integration tests
+    cmds:
+      - task: test
+      - task: integration-test
