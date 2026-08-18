@@ -2,8 +2,9 @@ cmake_minimum_required(VERSION 3.12)
 
 project(nats_asio)
 
-set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 option(ENABLE_TESTS "enable tests" OFF)
 option(BUILD_NATS_TOOL "build nats tool" OFF)
@@ -12,12 +13,12 @@ add_definitions(-DSPDLOG_FMT_EXTERNAL)
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake")
 
-include(${CMAKE_BINARY_DIR}/conanbuildinfo.cmake)
-conan_basic_setup()
-
 find_package(Boost REQUIRED)
 find_package(spdlog REQUIRED)
 find_package(OpenSSL REQUIRED)
+find_package(cxxopts REQUIRED)
+find_package(fmt REQUIRED)
+find_package(nlohmann_json REQUIRED)
 
 include_directories(
         "${CMAKE_CURRENT_LIST_DIR}/include"

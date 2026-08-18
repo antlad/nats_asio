@@ -2,6 +2,7 @@
 boost/1.91.0
 #spdlog optional - if you select this log implementation
 spdlog/1.17.0
+fmt/12.1.0
 #cxxopts only for examples
 cxxopts/3.3.1
 nlohmann_json/3.12.0

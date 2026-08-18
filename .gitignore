@@ -44,3 +44,4 @@ build_debug/*
 .cmake
 cmake-*
 .idea/
+CMakeUserPresets.json
