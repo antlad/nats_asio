@@ -1,7 +1,9 @@
+
+
 # nats-asio
 
 ## Overview
-This is [nats-io](https://nats.io/) client writen in c++14 with use of [boost](https://www.boost.org/) [asio](https://www.boost.org/doc/libs/release/libs/asio/) and coroutines libraries.
+This is [nats-io](https://nats.io/) client written in c++14 with use of [boost](https://www.boost.org/) [asio](https://www.boost.org/doc/libs/release/libs/asio/) and coroutines libraries.
 
 ## Requirements
 For Library
